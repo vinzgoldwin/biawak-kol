@@ -33,6 +33,14 @@ const initialRecordState: RecordState = {
   winner: 'A',
 }
 
+const navIcon: Record<NavKey, string> = {
+  dashboard: 'H',
+  record: '+',
+  saved: 'V',
+  history: '#',
+  players: 'P',
+}
+
 function App() {
   const [activeScreen, setActiveScreen] = useState<NavKey>('dashboard')
   const [recordState, setRecordState] = useState<RecordState>(initialRecordState)
@@ -48,55 +56,33 @@ function App() {
 
   const availablePlayers = useMemo(() => {
     const query = recordState.search.trim().toLowerCase()
-
-    return recordPool.filter((player) => {
-      if (assignedPlayers.has(player)) return false
-      return query.length === 0 || player.toLowerCase().includes(query)
-    })
+    return recordPool.filter((player) => !assignedPlayers.has(player) && (query === '' || player.toLowerCase().includes(query)))
   }, [assignedPlayers, recordState.search])
 
   const filteredPlayers = useMemo(() => {
     const query = playerQuery.trim().toLowerCase()
-
-    return players.filter((player) => {
-      return query.length === 0 || player.name.toLowerCase().includes(query)
-    })
+    return players.filter((player) => query === '' || player.name.toLowerCase().includes(query))
   }, [playerQuery, players])
 
-  const selectedPlayer =
-    players.find((player) => player.id === selectedPlayerId) ?? players[0]
-
+  const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? players[0]
   const teamsEven = recordState.teamA.length === recordState.teamB.length
-  const teamsFull =
-    recordState.teamA.length === recordState.teamSize &&
-    recordState.teamB.length === recordState.teamSize
+  const teamsFull = recordState.teamA.length === recordState.teamSize && recordState.teamB.length === recordState.teamSize
   const canSave = teamsEven && teamsFull && recordState.winner !== null
 
   const addPlayerToTeam = (playerName: string, team: Winner) => {
     setRecordState((current) => {
       const targetKey = team === 'A' ? 'teamA' : 'teamB'
-      const nextTeam = current[targetKey]
-
-      if (nextTeam.length >= current.teamSize) return current
-      if (current.teamA.includes(playerName) || current.teamB.includes(playerName)) {
-        return current
-      }
-
-      return {
-        ...current,
-        [targetKey]: [...nextTeam, playerName],
-      }
+      const targetTeam = current[targetKey]
+      if (targetTeam.length >= current.teamSize) return current
+      if (current.teamA.includes(playerName) || current.teamB.includes(playerName)) return current
+      return { ...current, [targetKey]: [...targetTeam, playerName] }
     })
   }
 
   const removePlayerFromTeam = (playerName: string, team: Winner) => {
     setRecordState((current) => {
       const targetKey = team === 'A' ? 'teamA' : 'teamB'
-
-      return {
-        ...current,
-        [targetKey]: current[targetKey].filter((name) => name !== playerName),
-      }
+      return { ...current, [targetKey]: current[targetKey].filter((name) => name !== playerName) }
     })
   }
 
@@ -113,15 +99,12 @@ function App() {
   }
 
   const saveGame = () => {
-    if (!canSave) return
-    setActiveScreen('saved')
+    if (canSave) setActiveScreen('saved')
   }
 
   const addPlayer = () => {
     const trimmed = playerQuery.trim()
-
-    if (trimmed.length === 0) return
-
+    if (!trimmed) return
     const id = trimmed.toLowerCase().replace(/\s+/g, '-')
     if (players.some((player) => player.id === id)) return
 
@@ -145,230 +128,137 @@ function App() {
 
   return (
     <div className="app-shell">
-      <aside className="desktop-nav">
-        <div className="brand-lockup">
-          <span className="brand-mark">BK</span>
-          <div>
-            <p className="eyebrow">Casual Club Tracker</p>
-            <h1>Biawak Kol Games</h1>
-          </div>
-        </div>
-
-        <nav className="nav-list" aria-label="Primary">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`nav-button ${activeScreen === item.id ? 'is-active' : ''}`}
-              onClick={() => setActiveScreen(item.id)}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
+      <aside className="desktop-sidebar">
+        <Brand compact />
+        <Nav activeScreen={activeScreen} onNavigate={setActiveScreen} variant="side" />
       </aside>
 
       <main className="app-main">
-        {activeScreen === 'dashboard' && (
-          <DashboardScreen onRecordNewGame={() => setActiveScreen('record')} />
-        )}
+        <header className="mobile-topbar">
+          <button type="button" className="icon-button" aria-label="Menu">Menu</button>
+          <Brand />
+          <button type="button" className="icon-button" aria-label="Alerts">Bell</button>
+        </header>
 
+        {activeScreen === 'dashboard' && <DashboardScreen onRecordNewGame={() => setActiveScreen('record')} />}
         {activeScreen === 'record' && (
           <RecordScreen
             recordState={recordState}
             availablePlayers={availablePlayers}
-            onSearchChange={(value) =>
-              setRecordState((current) => ({ ...current, search: value }))
-            }
-            onDateChange={(value) =>
-              setRecordState((current) => ({ ...current, dateLabel: value }))
-            }
-            onTeamSizeChange={(size) =>
-              setRecordState((current) => ({
-                ...current,
-                teamSize: size,
-                teamA: current.teamA.slice(0, size),
-                teamB: current.teamB.slice(0, size),
-                winner: current.winner,
-              }))
+            teamsEven={teamsEven}
+            canSave={canSave}
+            onSearchChange={(search) => setRecordState((current) => ({ ...current, search }))}
+            onDateChange={(dateLabel) => setRecordState((current) => ({ ...current, dateLabel }))}
+            onTeamSizeChange={(teamSize) =>
+              setRecordState((current) => ({ ...current, teamSize, teamA: current.teamA.slice(0, teamSize), teamB: current.teamB.slice(0, teamSize) }))
             }
             onAddPlayer={addPlayerToTeam}
             onRemovePlayer={removePlayerFromTeam}
-            onWinnerChange={(winner) =>
-              setRecordState((current) => ({ ...current, winner }))
-            }
+            onWinnerChange={(winner) => setRecordState((current) => ({ ...current, winner }))}
             onSave={saveGame}
-            teamsEven={teamsEven}
-            canSave={canSave}
           />
         )}
-
         {activeScreen === 'saved' && (
-          <SavedScreen
-            winner={recordState.winner ?? 'A'}
-            onRecordAgain={() => setActiveScreen('record')}
-            onViewLeaderboard={() => setActiveScreen('dashboard')}
-          />
+          <SavedScreen recordState={recordState} onRecordAgain={() => setActiveScreen('record')} onViewLeaderboard={() => setActiveScreen('dashboard')} />
         )}
-
-        {activeScreen === 'history' && (
-          <HistoryScreen
-            games={historyGames}
-            onEdit={loadGameIntoRecorder}
-            onDelete={(gameId) =>
-              setHistoryGames((current) => current.filter((game) => game.id !== gameId))
-            }
-          />
-        )}
-
+        {activeScreen === 'history' && <HistoryScreen games={historyGames} onEdit={loadGameIntoRecorder} onRemove={(gameId) => setHistoryGames((current) => current.filter((game) => game.id !== gameId))} />}
         {activeScreen === 'players' && (
           <PlayersScreen
             players={filteredPlayers}
             playerQuery={playerQuery}
+            selectedPlayer={selectedPlayer}
             selectedPlayerId={selectedPlayer.id}
             onSearchChange={setPlayerQuery}
             onSelectPlayer={setSelectedPlayerId}
             onAddPlayer={addPlayer}
-            selectedPlayer={selectedPlayer}
           />
         )}
       </main>
 
-      <nav className="mobile-nav" aria-label="Bottom navigation">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={`mobile-nav-button ${activeScreen === item.id ? 'is-active' : ''}`}
-            onClick={() => setActiveScreen(item.id)}
-          >
-            <span>{item.icon}</span>
-            <span>{item.label}</span>
-          </button>
-        ))}
-      </nav>
+      <Nav activeScreen={activeScreen} onNavigate={setActiveScreen} variant="bottom" />
     </div>
   )
 }
 
-function DashboardScreen({
-  onRecordNewGame,
-}: {
-  onRecordNewGame: () => void
-}) {
+function Nav({ activeScreen, onNavigate, variant }: { activeScreen: NavKey; onNavigate: (screen: NavKey) => void; variant: 'side' | 'bottom' }) {
   return (
-    <section className="screen">
-      <div className="screen-header">
-        <div>
-          <p className="eyebrow">Season Leaderboard</p>
-          <h2>Biawak Kol Games</h2>
-        </div>
+    <nav className={variant === 'side' ? 'side-nav' : 'bottom-nav'} aria-label="Navigation">
+      {navItems.map((item) => (
+        <button key={item.id} type="button" className={`${variant === 'side' ? 'nav-item' : 'bottom-nav-item'} ${activeScreen === item.id ? 'is-active' : ''}`} onClick={() => onNavigate(item.id)}>
+          <span>{navIcon[item.id]}</span>
+          {item.label}
+        </button>
+      ))}
+    </nav>
+  )
+}
 
-        <div className="header-actions">
-          <button type="button" className="season-pill">
-            Juni 2026
-          </button>
-          <button type="button" className="primary-button" onClick={onRecordNewGame}>
-            + Record New Game
-          </button>
-        </div>
+function Brand({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={`brand ${compact ? 'is-compact' : ''}`}>
+      <div className="brand-logo"><span>BK</span></div>
+      <div>
+        <strong>Biawak<br />Kol Games</strong>
+        {compact && <em>Casual Basketball Club</em>}
       </div>
+    </div>
+  )
+}
 
-      <div className="summary-grid">
+function DashboardScreen({ onRecordNewGame }: { onRecordNewGame: () => void }) {
+  return (
+    <section className="screen dashboard-screen">
+      <div className="toolbar-card">
+        <button type="button" className="select-pill">Juni 2026</button>
+        <button type="button" className="primary-button" onClick={onRecordNewGame}>+ Record New Game</button>
+      </div>
+      <section className="stat-grid">
         {summaryStats.map((item) => (
-          <article key={item.label} className="summary-card">
-            <span className="summary-label">{item.label}</span>
-            <strong>{item.value}</strong>
+          <article key={item.label} className="stat-card">
+            <span>{item.label}</span>
+            <strong className={item.label === 'Best Win Rate' ? 'green-text' : ''}>{item.value}</strong>
           </article>
         ))}
-      </div>
-
+      </section>
       <div className="chip-row">
-        <button type="button" className="filter-chip is-active">
-          All Players
-        </button>
-        <button type="button" className="filter-chip">
-          Qualified Only
-        </button>
-        <button type="button" className="filter-chip">
-          Minimum 5 Games
-        </button>
-        <button type="button" className="filter-chip">
-          Sort: Points
-        </button>
+        <button type="button" className="chip is-active">All Players</button>
+        <button type="button" className="chip">Qualified Only</button>
+        <button type="button" className="chip">Minimum 5 Games</button>
+        <button type="button" className="chip">Sort: Points</button>
       </div>
-
-      <section className="panel">
-        <div className="panel-heading">
-          <div>
-            <h3>Leaderboard</h3>
-            <p>Sorted by points, coefficient, win rate, then total games.</p>
-          </div>
-        </div>
-
-        <div className="leaderboard-list">
-          {leaderboardQualified.map((player, index) => (
-            <article
-              key={player.name}
-              className={`leaderboard-row ${index === 0 ? 'is-top-rank' : ''}`}
-            >
-              <div className="player-heading">
-                <span className="rank-pill">#{index + 1}</span>
-                <div>
-                  <strong>{player.name}</strong>
-                  <span>
-                    {player.games} games · {player.wins}W {player.losses}L
-                  </span>
-                </div>
-              </div>
-
-              <div className="row-stats">
-                <span>{player.points} pts</span>
-                <span>Coef {player.coefficient}</span>
-                <span className="stat-positive">{player.winRate} win rate</span>
-              </div>
-            </article>
-          ))}
-        </div>
+      <section className="card table-card"><LeaderboardTable rows={leaderboardQualified} ranked /></section>
+      <section className="card table-card compact-card">
+        <div className="section-title-row"><h2>Not Yet Qualified</h2><span>Minimum 5 games to qualify</span></div>
+        <LeaderboardTable rows={leaderboardUnqualified} />
       </section>
-
-      <section className="panel secondary-panel">
-        <div className="panel-heading">
-          <div>
-            <h3>Not Yet Qualified</h3>
-            <p>Minimum 5 games to qualify.</p>
-          </div>
-        </div>
-
-        <div className="leaderboard-list compact">
-          {leaderboardUnqualified.map((player) => (
-            <article key={player.name} className="leaderboard-row">
-              <div className="player-heading">
-                <div>
-                  <strong>{player.name}</strong>
-                  <span>
-                    {player.games} games · {player.wins}W {player.losses}L
-                  </span>
-                </div>
-              </div>
-
-              <div className="row-stats">
-                <span>{player.points} pts</span>
-                <span>Coef {player.coefficient}</span>
-                <span className="stat-positive">{player.winRate} win rate</span>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      <p className="footnote">Stats are automatic from recorded games.</p>
     </section>
   )
 }
 
-type RecordScreenProps = {
+function LeaderboardTable({ rows, ranked = false }: { rows: typeof leaderboardQualified; ranked?: boolean }) {
+  return (
+    <div className="leaderboard-table" role="table">
+      <div className="table-head" role="row">
+        {ranked && <span>Rank</span>}
+        <span>Player</span><span>G</span><span>W</span><span>L</span><span>Pts</span><span>Coef</span><span>Win %</span>
+      </div>
+      {rows.map((player, index) => (
+        <div key={player.name} className="table-row" role="row">
+          {ranked && <strong>{index + 1}</strong>}
+          <span className="table-player"><Avatar name={player.name} />{player.name}</span>
+          <span>{player.games}</span><span>{player.wins}</span><span>{player.losses}</span><strong>{player.points}</strong><span>{player.coefficient}</span><span className="win-pill">{player.winRate}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function RecordScreen({ recordState, availablePlayers, teamsEven, canSave, onSearchChange, onDateChange, onTeamSizeChange, onAddPlayer, onRemovePlayer, onWinnerChange, onSave }: {
   recordState: RecordState
   availablePlayers: string[]
+  teamsEven: boolean
+  canSave: boolean
   onSearchChange: (value: string) => void
   onDateChange: (value: string) => void
   onTeamSizeChange: (size: number) => void
@@ -376,406 +266,97 @@ type RecordScreenProps = {
   onRemovePlayer: (playerName: string, team: Winner) => void
   onWinnerChange: (winner: Winner) => void
   onSave: () => void
-  teamsEven: boolean
-  canSave: boolean
+}) {
+  return (
+    <section className="screen record-screen">
+      <div className="page-title"><h1>Record Game</h1></div>
+      <div className="form-grid two-columns">
+        <label className="field-card"><span>Date</span><input value={recordState.dateLabel} onChange={(event) => onDateChange(event.target.value)} /></label>
+        <label className="field-card"><span>Team Size</span><select value={recordState.teamSize} onChange={(event) => onTeamSizeChange(Number(event.target.value))}><option value={3}>3 v 3</option><option value={4}>4 v 4</option><option value={5}>5 v 5</option></select></label>
+      </div>
+      <label className="search-box"><span>Search</span><input value={recordState.search} placeholder="Search players..." onChange={(event) => onSearchChange(event.target.value)} /></label>
+      <section className="available-section">
+        <div className="section-title-row"><h2>Available Players</h2><span>tap A or B</span></div>
+        <div className="player-pill-grid">
+          {availablePlayers.map((player, index) => (
+            <div key={player} className="assign-player-card">
+              <Avatar name={player} seed={index} /><strong>{player}</strong>
+              <div className="assign-mini-actions"><button type="button" onClick={() => onAddPlayer(player, 'A')}>A</button><button type="button" onClick={() => onAddPlayer(player, 'B')}>B</button></div>
+            </div>
+          ))}
+        </div>
+      </section>
+      <div className="teams-grid">
+        <TeamBox title="Team A" tone="blue" players={recordState.teamA} teamSize={recordState.teamSize} onRemove={(name) => onRemovePlayer(name, 'A')} />
+        <TeamBox title="Team B" tone="red" players={recordState.teamB} teamSize={recordState.teamSize} onRemove={(name) => onRemovePlayer(name, 'B')} />
+      </div>
+      <section className="winner-card"><h2>Winner</h2><div className="winner-toggle"><button type="button" className={recordState.winner === 'A' ? 'is-active' : ''} onClick={() => onWinnerChange('A')}>Team A</button><button type="button" className={recordState.winner === 'B' ? 'is-active' : ''} onClick={() => onWinnerChange('B')}>Team B</button></div></section>
+      <p className={`save-status ${teamsEven ? 'is-ready' : 'is-error'}`}>{teamsEven ? 'Teams are even. Ready to save!' : 'Teams are uneven. Fix team size first.'}</p>
+      <button type="button" className="primary-button save-button" disabled={!canSave} onClick={onSave}>Save Game</button>
+    </section>
+  )
 }
 
-function RecordScreen({
-  recordState,
-  availablePlayers,
-  onSearchChange,
-  onDateChange,
-  onTeamSizeChange,
-  onAddPlayer,
-  onRemovePlayer,
-  onWinnerChange,
-  onSave,
-  teamsEven,
-  canSave,
-}: RecordScreenProps) {
+function TeamBox({ title, tone, players, teamSize, onRemove }: { title: string; tone: 'blue' | 'red'; players: string[]; teamSize: number; onRemove: (name: string) => void }) {
   return (
-    <section className="screen">
-      <div className="screen-header">
-        <div>
-          <p className="eyebrow">Fast Match Entry</p>
-          <h2>Record Game</h2>
-        </div>
-      </div>
-
-      <div className="record-layout">
-        <section className="panel record-primary">
-          <div className="record-toolbar">
-            <label className="input-card">
-              <span>Date</span>
-              <input
-                value={recordState.dateLabel}
-                onChange={(event) => onDateChange(event.target.value)}
-              />
-            </label>
-
-            <div className="input-card">
-              <span>Team Size</span>
-              <div className="segmented-control">
-                {[3, 4, 5].map((size) => (
-                  <button
-                    key={size}
-                    type="button"
-                    className={recordState.teamSize === size ? 'is-active' : ''}
-                    onClick={() => onTeamSizeChange(size)}
-                  >
-                    {size}v{size}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <label className="input-card full-width">
-            <span>Search player</span>
-            <input
-              value={recordState.search}
-              placeholder="Tap to filter available players"
-              onChange={(event) => onSearchChange(event.target.value)}
-            />
-          </label>
-
-          <div className="player-picker">
-            {availablePlayers.map((player) => (
-              <article key={player} className="available-player-card">
-                <div className="available-player-copy">
-                  <strong>{player}</strong>
-                  <span>Ready to assign</span>
-                </div>
-
-                <div className="assign-actions">
-                  <button type="button" onClick={() => onAddPlayer(player, 'A')}>
-                    Team A
-                  </button>
-                  <button type="button" onClick={() => onAddPlayer(player, 'B')}>
-                    Team B
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="record-secondary">
-          <TeamCard
-            title="Team A"
-            tone="team-a"
-            players={recordState.teamA}
-            teamSize={recordState.teamSize}
-            onRemove={(playerName) => onRemovePlayer(playerName, 'A')}
-          />
-
-          <TeamCard
-            title="Team B"
-            tone="team-b"
-            players={recordState.teamB}
-            teamSize={recordState.teamSize}
-            onRemove={(playerName) => onRemovePlayer(playerName, 'B')}
-          />
-
-          <section className="panel">
-            <div className="panel-heading">
-              <div>
-                <h3>Winner</h3>
-                <p>Select the winning side before saving.</p>
-              </div>
-            </div>
-
-            <div className="winner-toggle">
-              <button
-                type="button"
-                className={recordState.winner === 'A' ? 'is-active' : ''}
-                onClick={() => onWinnerChange('A')}
-              >
-                Team A
-              </button>
-              <button
-                type="button"
-                className={recordState.winner === 'B' ? 'is-active' : ''}
-                onClick={() => onWinnerChange('B')}
-              >
-                Team B
-              </button>
-            </div>
-
-            <p className={`status-note ${teamsEven ? 'is-good' : 'is-warning'}`}>
-              {teamsEven
-                ? 'Teams are even. Ready to save!'
-                : 'Teams are uneven. Add or remove players before saving.'}
-            </p>
-
-            <button
-              type="button"
-              className="primary-button wide-button"
-              onClick={onSave}
-              disabled={!canSave}
-            >
-              Save Game
-            </button>
-          </section>
-        </section>
+    <section className={`team-box ${tone}`}>
+      <header><h2>{title}</h2><span>{players.length}</span></header>
+      <div className="team-list">
+        {players.map((player, index) => <button key={player} type="button" onClick={() => onRemove(player)}><Avatar name={player} seed={index} />{player}<span>x</span></button>)}
+        {Array.from({ length: Math.max(teamSize - players.length, 0) }).map((_, index) => <div key={index} className="empty-slot">Empty slot</div>)}
       </div>
     </section>
   )
 }
 
-function TeamCard({
-  title,
-  tone,
-  players,
-  teamSize,
-  onRemove,
-}: {
-  title: string
-  tone: string
-  players: string[]
-  teamSize: number
-  onRemove: (playerName: string) => void
-}) {
+function SavedScreen({ recordState, onRecordAgain, onViewLeaderboard }: { recordState: RecordState; onRecordAgain: () => void; onViewLeaderboard: () => void }) {
+  const winningPlayers = recordState.winner === 'A' ? recordState.teamA : recordState.teamB
+  const losingPlayers = recordState.winner === 'A' ? recordState.teamB : recordState.teamA
   return (
-    <section className={`panel team-card ${tone}`}>
-      <div className="panel-heading">
-        <div>
-          <h3>{title}</h3>
-          <p>Tap a player chip to remove.</p>
-        </div>
-        <span className="count-badge">
-          {players.length}/{teamSize}
-        </span>
-      </div>
-
-      <div className="team-chip-list">
-        {players.map((player) => (
-          <button key={player} type="button" className="team-chip" onClick={() => onRemove(player)}>
-            {player}
-            <span>×</span>
-          </button>
-        ))}
-      </div>
+    <section className="screen saved-screen">
+      <div className="success-icon">OK</div><h1>Game saved</h1><p>Great game! Stats updated.</p>
+      <div className="saved-match-card"><SavedTeam label="Winning Team" title={recordState.winner === 'A' ? 'Team A' : 'Team B'} players={winningPlayers} winner /><div className="versus">VS</div><SavedTeam label="Losing Team" title={recordState.winner === 'A' ? 'Team B' : 'Team A'} players={losingPlayers} /></div>
+      <div className="points-grid"><div><span>Winners</span><strong className="green-text">+3</strong></div><div><span>Losers</span><strong className="red-text">-1</strong></div></div>
+      <button type="button" className="primary-button save-button" onClick={onRecordAgain}>+ Record Another Game</button>
+      <button type="button" className="secondary-button save-button" onClick={onViewLeaderboard}>View Leaderboard</button>
     </section>
   )
 }
 
-function SavedScreen({
-  winner,
-  onRecordAgain,
-  onViewLeaderboard,
-}: {
-  winner: Winner
-  onRecordAgain: () => void
-  onViewLeaderboard: () => void
-}) {
-  const losingTeam = winner === 'A' ? 'Team B' : 'Team A'
-
-  return (
-    <section className="screen centered-screen">
-      <article className="save-card">
-        <span className="save-badge">Game saved</span>
-        <h2>Great game! Stats updated.</h2>
-        <div className="save-grid">
-          <div>
-            <span>Winning Team</span>
-            <strong>{winner === 'A' ? 'Team A' : 'Team B'}</strong>
-          </div>
-          <div>
-            <span>Losing Team</span>
-            <strong>{losingTeam}</strong>
-          </div>
-          <div>
-            <span>Points applied</span>
-            <strong>Winners +3, Losers -1</strong>
-          </div>
-        </div>
-
-        <div className="save-actions">
-          <button type="button" className="primary-button" onClick={onRecordAgain}>
-            Record Another Game
-          </button>
-          <button type="button" className="secondary-button" onClick={onViewLeaderboard}>
-            View Leaderboard
-          </button>
-        </div>
-      </article>
-    </section>
-  )
+function SavedTeam({ label, title, players, winner = false }: { label: string; title: string; players: string[]; winner?: boolean }) {
+  return <div className={`saved-team ${winner ? 'winner' : 'loser'}`}><span>{label}</span><h2>{title}</h2>{players.map((player) => <strong key={player}>{player}</strong>)}</div>
 }
 
-function HistoryScreen({
-  games,
-  onEdit,
-  onDelete,
-}: {
-  games: HistoryGame[]
-  onEdit: (game: HistoryGame) => void
-  onDelete: (gameId: number) => void
-}) {
+function HistoryScreen({ games, onEdit, onRemove }: { games: HistoryGame[]; onEdit: (game: HistoryGame) => void; onRemove: (gameId: number) => void }) {
   return (
-    <section className="screen">
-      <div className="screen-header">
-        <div>
-          <p className="eyebrow">Audit Trail</p>
-          <h2>History</h2>
-        </div>
-      </div>
-
+    <section className="screen history-screen">
+      <div className="tabs"><button className="is-active" type="button">History</button><button type="button">Players</button></div>
       <div className="history-list">
-        {games.map((game) => (
-          <article key={game.id} className="history-card">
-            <div className="history-head">
-              <div>
-                <strong>
-                  Game #{game.id} - {game.dateShort}
-                </strong>
-                <span>{game.winner === 'A' ? 'Team A won' : 'Team B won'}</span>
-              </div>
-              <span className="winner-chip">{game.winner === 'A' ? 'Team A' : 'Team B'}</span>
-            </div>
-
-            <div className="history-body">
-              <p>
-                <strong>Team A:</strong> {game.teamA.join(', ')}
-              </p>
-              <p>
-                <strong>Team B:</strong> {game.teamB.join(', ')}
-              </p>
-            </div>
-
-            <div className="history-actions">
-              <button type="button" className="secondary-button" onClick={() => onEdit(game)}>
-                Edit
-              </button>
-              <button
-                type="button"
-                className="danger-button"
-                onClick={() => onDelete(game.id)}
-              >
-                Delete
-              </button>
-            </div>
-          </article>
-        ))}
+        {games.map((game) => <article key={game.id} className="history-card"><header><div><h2>Game #{game.id}</h2><span>{game.dateShort}</span></div><strong className={game.winner === 'A' ? 'winner-badge' : 'winner-badge red'}>Team {game.winner} won</strong></header><div className="history-teams"><div><h3>Team A</h3><p>{game.teamA.join(', ')}</p></div><span>VS</span><div><h3>Team B</h3><p>{game.teamB.join(', ')}</p></div></div><div className="history-actions"><button type="button" onClick={() => onEdit(game)}>Edit</button><button type="button" className="danger" onClick={() => onRemove(game.id)}>Remove</button></div></article>)}
       </div>
+      <button type="button" className="load-more">Load more games</button>
     </section>
   )
 }
 
-function PlayersScreen({
-  players,
-  playerQuery,
-  selectedPlayerId,
-  onSearchChange,
-  onSelectPlayer,
-  onAddPlayer,
-  selectedPlayer,
-}: {
-  players: PlayerCard[]
-  playerQuery: string
-  selectedPlayerId: string
-  onSearchChange: (value: string) => void
-  onSelectPlayer: (playerId: string) => void
-  onAddPlayer: () => void
-  selectedPlayer: PlayerCard
-}) {
+function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId, onSearchChange, onSelectPlayer, onAddPlayer }: { players: PlayerCard[]; playerQuery: string; selectedPlayer: PlayerCard; selectedPlayerId: string; onSearchChange: (value: string) => void; onSelectPlayer: (playerId: string) => void; onAddPlayer: () => void }) {
   return (
-    <section className="screen">
-      <div className="screen-header">
-        <div>
-          <p className="eyebrow">Club Roster</p>
-          <h2>Players</h2>
-        </div>
-      </div>
-
-      <div className="players-layout">
-        <section className="panel">
-          <div className="player-toolbar">
-            <label className="input-card full-width">
-              <span>Search players</span>
-              <input
-                value={playerQuery}
-                placeholder="Find a name or type a new one"
-                onChange={(event) => onSearchChange(event.target.value)}
-              />
-            </label>
-
-            <button type="button" className="primary-button" onClick={onAddPlayer}>
-              Add Player
-            </button>
-          </div>
-
-          <div className="player-list">
-            {players.map((player) => (
-              <button
-                key={player.id}
-                type="button"
-                className={`player-row ${selectedPlayerId === player.id ? 'is-active' : ''}`}
-                onClick={() => onSelectPlayer(player.id)}
-              >
-                <div>
-                  <strong>{player.name}</strong>
-                  <span>{player.active ? 'Active this season' : 'Inactive'}</span>
-                </div>
-                <span className={`status-badge ${player.active ? 'active' : 'inactive'}`}>
-                  {player.active ? 'Active' : 'Inactive'}
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="panel player-detail-card">
-          <div className="panel-heading">
-            <div>
-              <h3>{selectedPlayer.name}</h3>
-              <p>Stats are calculated from recorded games.</p>
-            </div>
-          </div>
-
-          <div className="detail-stats">
-            <div>
-              <span>Games</span>
-              <strong>{selectedPlayer.games}</strong>
-            </div>
-            <div>
-              <span>Wins</span>
-              <strong className="stat-positive">{selectedPlayer.wins}</strong>
-            </div>
-            <div>
-              <span>Losses</span>
-              <strong className="stat-negative">{selectedPlayer.losses}</strong>
-            </div>
-            <div>
-              <span>Points</span>
-              <strong>{selectedPlayer.points}</strong>
-            </div>
-            <div>
-              <span>Coef</span>
-              <strong>{selectedPlayer.coefficient}</strong>
-            </div>
-            <div>
-              <span>Win Rate</span>
-              <strong>{selectedPlayer.winRate}</strong>
-            </div>
-          </div>
-
-          <div className="recent-list">
-            <h4>Recent games</h4>
-            {selectedPlayer.recentGames.map((game) => (
-              <article key={game.label} className="recent-row">
-                <span>{game.label}</span>
-                <strong className={game.result.startsWith('W') ? 'stat-positive' : 'stat-negative'}>
-                  {game.result}
-                </strong>
-              </article>
-            ))}
-          </div>
-        </section>
-      </div>
+    <section className="screen players-screen">
+      <div className="tabs"><button type="button">History</button><button className="is-active" type="button">Players</button></div>
+      <label className="search-box"><span>Search</span><input value={playerQuery} placeholder="Find or add player..." onChange={(event) => onSearchChange(event.target.value)} /></label>
+      <button type="button" className="primary-button save-button" onClick={onAddPlayer}>+ Add Player</button>
+      <div className="players-layout"><section className="card player-list-card">{players.map((player, index) => <button key={player.id} type="button" className={`player-row ${selectedPlayerId === player.id ? 'is-active' : ''}`} onClick={() => onSelectPlayer(player.id)}><Avatar name={player.name} seed={index} /><div><strong>{player.name}</strong><span>{player.games} games - {player.winRate} win</span></div><em>{player.active ? 'Active' : 'New'}</em></button>)}</section><PlayerDetail player={selectedPlayer} /></div>
     </section>
   )
+}
+
+function PlayerDetail({ player }: { player: PlayerCard }) {
+  return <section className="card player-detail-card"><header><Avatar name={player.name} /><div><h2>{player.name}</h2><p>Stats are automatic from recorded games.</p></div></header><div className="points-grid six"><div><span>Games</span><strong>{player.games}</strong></div><div><span>Wins</span><strong className="green-text">{player.wins}</strong></div><div><span>Losses</span><strong className="red-text">{player.losses}</strong></div><div><span>Points</span><strong>{player.points}</strong></div><div><span>Coef</span><strong>{player.coefficient}</strong></div><div><span>Win Rate</span><strong>{player.winRate}</strong></div></div><div className="recent-games"><h3>Recent games</h3>{player.recentGames.length === 0 && <p>No games yet.</p>}{player.recentGames.map((game) => <div key={game.label}><span>{game.label}</span><strong className={game.result.startsWith('W') ? 'green-text' : 'red-text'}>{game.result}</strong></div>)}</div></section>
+}
+
+function Avatar({ name, seed = 0 }: { name: string; seed?: number }) {
+  const initials = name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+  return <span className={`avatar avatar-${seed % 5}`}>{initials}</span>
 }
 
 export default App
