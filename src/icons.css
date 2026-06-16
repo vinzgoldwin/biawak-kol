@@ -76,6 +76,10 @@
   gap: 6px;
 }
 
+span.avatar {
+  color: #fff;
+}
+
 @media (min-width: 860px) {
   .nav-item .nav-icon {
     width: 18px;
