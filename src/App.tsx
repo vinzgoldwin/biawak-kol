@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import './index.css'
+import './icons.css'
 import {
   historySeed,
   leaderboardQualified,
@@ -12,6 +13,24 @@ import {
   type NavKey,
   type PlayerCard,
 } from './data'
+import {
+  BarChartIcon,
+  BellIcon,
+  CalendarIcon,
+  CheckCircleIcon,
+  CheckIcon,
+  HistoryIcon,
+  HomeIcon,
+  MenuIcon,
+  PencilIcon,
+  PlusIcon,
+  SaveIcon,
+  SearchIcon,
+  TrashIcon,
+  TrophyIcon,
+  UsersIcon,
+  type IconComponent,
+} from './icons'
 
 type Winner = 'A' | 'B'
 
@@ -33,12 +52,12 @@ const initialRecordState: RecordState = {
   winner: 'A',
 }
 
-const navIcon: Record<NavKey, string> = {
-  dashboard: 'H',
-  record: '+',
-  saved: 'V',
-  history: '#',
-  players: 'P',
+const navIcon: Record<NavKey, IconComponent> = {
+  dashboard: HomeIcon,
+  record: PlusIcon,
+  saved: CheckCircleIcon,
+  history: HistoryIcon,
+  players: UsersIcon,
 }
 
 function App() {
