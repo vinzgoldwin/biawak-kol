@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "biawak-kol",
+  "compatibility_date": "2026-06-16",
+  "pages_build_output_dir": "./dist",
+  "kv_namespaces": [
+    {
+      "binding": "BIAWAK_KOL_STATE",
+      "id": "77f4eb08740c4f66aab125f96f5b4ffc"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

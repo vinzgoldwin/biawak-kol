@@ -1,73 +1,49 @@
-# React + TypeScript + Vite
+# Biawak KOL
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Mobile-first leaderboard app for recording Biawak KOL games.
 
-Currently, two official plugins are available:
+## Local Development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The plain Vite dev server uses `localStorage` as a cache and cannot run Cloudflare Pages Functions.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+To test the shared Cloudflare KV API locally:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cp .dev.vars.example .dev.vars
+# edit .dev.vars and set ADMIN_PASSWORD
+npm run cf:dev
+```
+
+## Cloudflare Persistence
+
+Shared state is stored in Workers KV as one JSON value:
+
+- KV namespace: `biawak-kol-state`
+- KV namespace id: `77f4eb08740c4f66aab125f96f5b4ffc`
+- Binding name: `BIAWAK_KOL_STATE`
+- Key: `biawak-kol.shared-state`
+
+The frontend reads from `GET /api/state`. Create, update, delete, undo, and player-add actions write through `POST /api/state` with the saved password. The password is checked only in the Cloudflare Function via the `ADMIN_PASSWORD` secret.
+
+Before the first deploy, set the production secret:
+
+```bash
+npx wrangler pages secret put ADMIN_PASSWORD
+```
+
+Deploy:
+
+```bash
+npm run cf:deploy
+```
+
+Regenerate Cloudflare runtime types after changing `wrangler.jsonc`:
+
+```bash
+npx wrangler types
 ```

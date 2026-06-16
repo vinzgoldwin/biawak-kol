@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
+import { toBlob } from 'html-to-image'
 import { cn } from '@/lib/utils'
 import { Avatar as ShadAvatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -25,14 +26,15 @@ import {
   CheckIcon,
   HistoryIcon,
   HomeIcon,
+  ImageIcon,
   PencilIcon,
   PlusIcon,
   SearchIcon,
   TrashIcon,
   UsersIcon,
-  XIcon,
   type IconComponent,
 } from './icons'
+import { fetchSharedState, saveSharedState, SharedStateError, type SharedState } from './remote-state'
 import { buildDashboardSummary, buildLeaderboard, buildPlayerStats, type SummaryStat } from './stats'
 
 type Winner = 'A' | 'B'
@@ -41,7 +43,6 @@ const TEAM_SIZE = 5
 const HISTORY_STORAGE_KEY = 'biawak-kol.historyGames'
 const ROSTER_STORAGE_KEY = 'biawak-kol.rosterPlayers'
 const PROTECTED_PASSWORD_STORAGE_KEY = 'biawak-kol.protectedPassword'
-const PROTECTED_PASSWORD = 'bangmomotmvp'
 
 type RecordState = {
   dateValue: string
@@ -64,7 +65,7 @@ type UndoToast = {
 type PendingProtectedAction = {
   id: number
   title: string
-  onAllowed: () => void
+  onAllowed: () => void | Promise<void>
 }
 
 const navIcon: Record<NavKey, IconComponent> = {
@@ -253,13 +254,13 @@ function writeStoredArray<T>(key: string, value: T[]) {
   }
 }
 
-function hasStoredProtectedAccess() {
-  if (typeof window === 'undefined') return false
+function getStoredProtectedPassword() {
+  if (typeof window === 'undefined') return null
 
   try {
-    return window.localStorage.getItem(PROTECTED_PASSWORD_STORAGE_KEY) === PROTECTED_PASSWORD
+    return window.localStorage.getItem(PROTECTED_PASSWORD_STORAGE_KEY)
   } catch {
-    return false
+    return null
   }
 }
 
@@ -268,6 +269,14 @@ function storeProtectedAccess(password: string) {
     window.localStorage.setItem(PROTECTED_PASSWORD_STORAGE_KEY, password)
   } catch {
     // Losing persistence only means the user may need to unlock again later.
+  }
+}
+
+function clearProtectedAccess() {
+  try {
+    window.localStorage.removeItem(PROTECTED_PASSWORD_STORAGE_KEY)
+  } catch {
+    // The next protected write will ask for the password again.
   }
 }
 
@@ -282,6 +291,77 @@ function App() {
   const [undoToast, setUndoToast] = useState<UndoToast | null>(null)
   const [editingGameId, setEditingGameId] = useState<number | null>(null)
   const [pendingProtectedAction, setPendingProtectedAction] = useState<PendingProtectedAction | null>(null)
+  const [imageCopyStatus, setImageCopyStatus] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle')
+  const [remoteVersion, setRemoteVersion] = useState(0)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const imageExportRef = useRef<HTMLDivElement>(null)
+
+  const applySharedState = useCallback((sharedState: SharedState) => {
+    setHistoryGames(sharedState.historyGames)
+    setRosterPlayers(sharedState.rosterPlayers)
+    setRemoteVersion(sharedState.version)
+  }, [])
+
+  const handleSharedStateError = useCallback((error: unknown) => {
+    if (!(error instanceof SharedStateError)) return
+
+    if (error.code === 'unauthorized') {
+      clearProtectedAccess()
+      return
+    }
+
+    if (error.code === 'conflict' && error.latestState) {
+      applySharedState(error.latestState)
+    }
+  }, [applySharedState])
+
+  const persistSharedState = useCallback(async (nextHistoryGames: HistoryGame[], nextRosterPlayers: RosterPlayer[]) => {
+    const password = getStoredProtectedPassword()
+    if (!password) return null
+
+    setIsSyncing(true)
+    try {
+      const sharedState = await saveSharedState({
+        password,
+        expectedVersion: remoteVersion,
+        historyGames: nextHistoryGames,
+        rosterPlayers: nextRosterPlayers,
+      })
+      applySharedState(sharedState)
+      return sharedState
+    } catch (error) {
+      handleSharedStateError(error)
+      return null
+    } finally {
+      setIsSyncing(false)
+    }
+  }, [applySharedState, handleSharedStateError, remoteVersion])
+
+  useEffect(() => {
+    let shouldIgnore = false
+
+    async function loadInitialSharedState() {
+      try {
+        const sharedState = await fetchSharedState()
+        if (shouldIgnore) return
+
+        if (sharedState === null) {
+          setRemoteVersion(0)
+          return
+        }
+
+        applySharedState(sharedState)
+      } catch (error) {
+        if (!shouldIgnore) handleSharedStateError(error)
+      }
+    }
+
+    void loadInitialSharedState()
+
+    return () => {
+      shouldIgnore = true
+    }
+  }, [applySharedState, handleSharedStateError])
 
   useEffect(() => {
     writeStoredArray(HISTORY_STORAGE_KEY, historyGames)
@@ -348,9 +428,9 @@ function App() {
   const teamsFull = recordState.teamA.length === TEAM_SIZE && recordState.teamB.length === TEAM_SIZE
   const canSave = teamsEven && teamsFull && recordState.winner !== null
 
-  const runProtectedAction = (title: string, onAllowed: () => void) => {
-    if (hasStoredProtectedAccess()) {
-      onAllowed()
+  const runProtectedAction = (title: string, onAllowed: () => void | Promise<void>) => {
+    if (getStoredProtectedPassword()) {
+      void onAllowed()
       return
     }
 
@@ -362,12 +442,12 @@ function App() {
   }
 
   const unlockProtectedAction = (password: string) => {
-    if (password !== PROTECTED_PASSWORD || pendingProtectedAction === null) return false
+    if (password.trim() === '' || pendingProtectedAction === null) return false
 
     storeProtectedAccess(password)
     const action = pendingProtectedAction.onAllowed
     setPendingProtectedAction(null)
-    action()
+    void action()
     return true
   }
 
@@ -417,15 +497,17 @@ function App() {
     })
   }
 
-  const saveGame = () => {
-    if (!canSave) return
+  const saveGame = async () => {
+    if (!canSave || isSyncing) return
 
     const originalGame = editingGameId === null ? null : historyGames.find((game) => game.id === editingGameId) ?? null
     const savedGame = createHistoryGame(recordState, historyGames, originalGame?.id)
     if (savedGame === null) return
 
     if (originalGame) {
-      setHistoryGames((current) => current.map((game) => (game.id === originalGame.id ? savedGame : game)))
+      const nextHistoryGames = historyGames.map((game) => (game.id === originalGame.id ? savedGame : game))
+      if ((await persistSharedState(nextHistoryGames, rosterPlayers)) === null) return
+
       setUndoToast({
         id: Date.now(),
         type: 'restore-updated',
@@ -435,7 +517,9 @@ function App() {
       })
       setEditingGameId(null)
     } else {
-      setHistoryGames((current) => [savedGame, ...current])
+      const nextHistoryGames = [savedGame, ...historyGames]
+      if ((await persistSharedState(nextHistoryGames, rosterPlayers)) === null) return
+
       setUndoToast({
         id: Date.now(),
         type: 'remove-saved',
@@ -450,12 +534,14 @@ function App() {
   }
 
   const removeGame = (gameId: number) => {
-    runProtectedAction(`Hapus Game #${gameId}`, () => {
+    runProtectedAction(`Hapus Game #${gameId}`, async () => {
       const restoreIndex = historyGames.findIndex((game) => game.id === gameId)
       const gameToRemove = historyGames[restoreIndex]
       if (!gameToRemove) return
 
-      setHistoryGames((current) => current.filter((game) => game.id !== gameId))
+      const nextHistoryGames = historyGames.filter((game) => game.id !== gameId)
+      if ((await persistSharedState(nextHistoryGames, rosterPlayers)) === null) return
+
       setUndoToast({
         id: Date.now(),
         type: 'restore-deleted',
@@ -467,43 +553,73 @@ function App() {
     })
   }
 
-  const undoLastAction = () => {
+  const undoLastAction = async () => {
     if (undoToast === null) return
 
-    if (undoToast.type === 'remove-saved') {
-      setHistoryGames((current) => current.filter((game) => game.id !== undoToast.gameId))
-      setActiveScreen('record')
-    } else if (undoToast.type === 'restore-deleted') {
-      setHistoryGames((current) => {
-        if (current.some((game) => game.id === undoToast.game.id)) return current
+    let nextHistoryGames = historyGames
+    let nextScreen: NavKey = 'history'
 
-        const nextGames = [...current]
+    if (undoToast.type === 'remove-saved') {
+      nextHistoryGames = historyGames.filter((game) => game.id !== undoToast.gameId)
+      nextScreen = 'record'
+    } else if (undoToast.type === 'restore-deleted') {
+      if (!historyGames.some((game) => game.id === undoToast.game.id)) {
+        const nextGames = [...historyGames]
         const boundedIndex = Math.min(Math.max(undoToast.restoreIndex, 0), nextGames.length)
         nextGames.splice(boundedIndex, 0, undoToast.game)
-        return nextGames
-      })
-      setActiveScreen('history')
+        nextHistoryGames = nextGames
+      }
     } else {
-      setHistoryGames((current) => current.map((game) => (game.id === undoToast.game.id ? undoToast.game : game)))
-      setActiveScreen('history')
+      nextHistoryGames = historyGames.map((game) => (game.id === undoToast.game.id ? undoToast.game : game))
     }
 
+    if ((await persistSharedState(nextHistoryGames, rosterPlayers)) === null) return
+
+    setActiveScreen(nextScreen)
     setUndoToast(null)
   }
 
-  const addPlayer = () => {
+  const addPlayer = async () => {
     const trimmed = playerQuery.trim()
     if (!trimmed) return
     const id = trimmed.toLowerCase().replace(/\s+/g, '-')
     if (rosterPlayers.some((player) => player.id === id || player.name.toLowerCase() === trimmed.toLowerCase())) return
 
-    setRosterPlayers((current) => [{ id, name: trimmed }, ...current])
+    const nextRosterPlayers = [{ id, name: trimmed }, ...rosterPlayers]
+    if ((await persistSharedState(historyGames, nextRosterPlayers)) === null) return
+
     setSelectedPlayerId(id)
     setPlayerQuery('')
   }
 
   const runAddPlayer = () => {
     runProtectedAction('Tambah Pemain', addPlayer)
+  }
+
+  useEffect(() => {
+    if (imageCopyStatus !== 'copied' && imageCopyStatus !== 'error') return undefined
+
+    const timeoutId = window.setTimeout(() => setImageCopyStatus('idle'), 2200)
+    return () => window.clearTimeout(timeoutId)
+  }, [imageCopyStatus])
+
+  const copyLeaderboardImage = async () => {
+    if (!imageExportRef.current || imageCopyStatus === 'copying') return
+
+    setImageCopyStatus('copying')
+    try {
+      const blob = await toBlob(imageExportRef.current, { pixelRatio: 2, cacheBust: true })
+      if (!blob) throw new Error('Failed to generate leaderboard image')
+
+      if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+        throw new Error('Image clipboard is not supported in this browser')
+      }
+
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+      setImageCopyStatus('copied')
+    } catch {
+      setImageCopyStatus('error')
+    }
   }
 
   return (
@@ -513,8 +629,8 @@ function App() {
         <Nav activeScreen={activeScreen} onNavigate={navigateToScreen} variant="side" />
       </aside>
 
-      <main className="mx-auto w-full max-w-[430px] px-3.5 pb-24 pt-3.5 md:mx-0 md:max-w-5xl md:px-7 md:py-6">
-        <header className="mb-3 flex h-14 items-center justify-center md:hidden">
+      <main className="mx-auto w-full max-w-[430px] px-3.5 pb-28 pt-2 md:mx-0 md:max-w-5xl md:px-7 md:py-6">
+        <header className="mb-2 flex h-11 items-center justify-center md:hidden">
           <Brand />
         </header>
 
@@ -526,6 +642,8 @@ function App() {
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
             onRecordNewGame={() => runProtectedAction('Buka Catat Game', openBlankRecorder)}
+            onCopyImage={copyLeaderboardImage}
+            imageCopyStatus={imageCopyStatus}
           />
         )}
         {activeScreen === 'record' && (
@@ -534,7 +652,7 @@ function App() {
             availablePlayers={availablePlayers}
             editingGameId={editingGameId}
             teamsFull={teamsFull}
-            canSave={canSave}
+            canSave={canSave && !isSyncing}
             onSearchChange={(search) => setRecordState((current) => ({ ...current, search }))}
             onDateChange={(dateValue) => setRecordState((current) => ({ ...current, dateValue }))}
             onAddPlayer={addPlayerToTeam}
@@ -586,6 +704,7 @@ function App() {
           onCancel={() => setPendingProtectedAction(null)}
         />
       )}
+      <LeaderboardImageExport exportRef={imageExportRef} players={dashboardPlayers} selectedMonth={selectedMonth} />
 
       <Nav activeScreen={activeScreen} onNavigate={navigateToScreen} variant="bottom" />
     </div>
@@ -614,7 +733,7 @@ function PasswordGateDialog({ title, onUnlock, onCancel }: {
       <form className="grid w-full max-w-sm gap-4 rounded-3xl border bg-card p-5 shadow-xl" onSubmit={submitPassword}>
         <div className="grid gap-1">
           <h2 id="password-gate-title" className="font-heading text-lg font-semibold">{title}</h2>
-          <p className="text-sm text-muted-foreground">Masukkan password satu kali. Akses akan tersimpan di perangkat ini.</p>
+          <p className="text-sm text-muted-foreground">Masukkan password satu kali. Cloudflare akan memeriksanya saat menyimpan.</p>
         </div>
         <div className="grid gap-2">
           <Input
@@ -661,13 +780,13 @@ function UndoToastView({ message, actionLabel, onAction, onDismiss }: {
 function Nav({ activeScreen, onNavigate, variant }: { activeScreen: NavKey; onNavigate: (screen: NavKey) => void; variant: 'side' | 'bottom' }) {
   if (variant === 'bottom') {
     return (
-      <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto grid w-full max-w-[430px] grid-cols-4 gap-1 border-t bg-background/95 px-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur md:hidden" aria-label="Navigasi utama">
+      <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto grid w-full max-w-[430px] grid-cols-4 gap-1 border-t bg-background/95 px-3 pb-[calc(0.35rem+env(safe-area-inset-bottom))] pt-1.5 backdrop-blur md:hidden" aria-label="Navigasi utama">
         {navItems.map((item) => {
           const Icon = navIcon[item.id]
 
           return (
-            <Button key={item.id} type="button" variant={activeScreen === item.id ? 'default' : 'ghost'} className="h-14 flex-col gap-1 rounded-3xl px-1 text-[10px]" data-active={activeScreen === item.id} onClick={() => onNavigate(item.id)}>
-              <Icon data-icon="inline-start" />
+            <Button key={item.id} type="button" variant={activeScreen === item.id ? 'default' : 'ghost'} className="h-12 flex-col gap-0.5 rounded-2xl px-1 text-[10px] leading-none" data-active={activeScreen === item.id} onClick={() => onNavigate(item.id)}>
+              <Icon />
               {item.label}
             </Button>
           )
@@ -704,13 +823,15 @@ function Brand({ compact = false }: { compact?: boolean }) {
   )
 }
 
-function DashboardScreen({ summaryStats, leaderboardRows, monthOptions, selectedMonth, onMonthChange, onRecordNewGame }: {
+function DashboardScreen({ summaryStats, leaderboardRows, monthOptions, selectedMonth, onMonthChange, onRecordNewGame, onCopyImage, imageCopyStatus }: {
   summaryStats: SummaryStat[]
   leaderboardRows: LeaderboardRow[]
   monthOptions: MonthOption[]
   selectedMonth: string
   onMonthChange: (month: string) => void
   onRecordNewGame: () => void
+  onCopyImage: () => void
+  imageCopyStatus: 'idle' | 'copying' | 'copied' | 'error'
 }) {
   return (
     <section className="grid gap-4 md:max-w-3xl">
@@ -727,38 +848,153 @@ function DashboardScreen({ summaryStats, leaderboardRows, monthOptions, selected
             </SelectGroup>
           </SelectContent>
         </Select>
-        <Button type="button" className="h-11" onClick={onRecordNewGame}>
-          <PlusIcon data-icon="inline-start" />
-          Catat Game Baru
-        </Button>
+        <div className="flex gap-2">
+          <Button type="button" className="h-11 grow" onClick={onRecordNewGame}>
+            <PlusIcon data-icon="inline-start" />
+            Catat Game Baru
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-11 w-11 shrink-0"
+            aria-label={imageCopyStatus === 'copying' ? 'Menyalin gambar klasemen' : 'Copy gambar klasemen'}
+            disabled={imageCopyStatus === 'copying'}
+            onClick={onCopyImage}
+          >
+            <ImageIcon size={20} />
+          </Button>
+        </div>
       </div>
+      {imageCopyStatus !== 'idle' && (
+        <p className={cn('px-1 text-xs font-medium', imageCopyStatus === 'error' ? 'text-destructive' : 'text-primary')} role="status" aria-live="polite">
+          {imageCopyStatus === 'copying' && 'Menyalin gambar klasemen...'}
+          {imageCopyStatus === 'copied' && 'Gambar klasemen tersalin.'}
+          {imageCopyStatus === 'error' && 'Browser ini belum mengizinkan copy gambar. Coba dari Chrome atau Edge.'}
+        </p>
+      )}
 
-      <section className="grid grid-cols-4 gap-2">
+      <section className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-2">
         {summaryStats.map((item) => (
-          <Card key={item.label} size="sm" className="min-h-20 justify-center rounded-3xl shadow-sm">
-            <CardContent className="grid gap-1.5 px-3">
-              <span className="text-[10px] leading-tight text-muted-foreground">{item.label}</span>
-              <strong className="text-xl font-semibold tracking-normal text-foreground">{item.value}</strong>
+          <Card key={item.label} size="sm" className="min-h-24 justify-center rounded-2xl shadow-sm md:min-h-20 md:rounded-3xl">
+            <CardContent className="grid gap-1.5 px-4 md:px-3">
+              <span className="text-xs leading-tight text-muted-foreground md:text-[10px]">{item.label}</span>
+              <strong className="text-2xl font-semibold tracking-normal text-foreground md:text-xl">{item.value}</strong>
             </CardContent>
           </Card>
         ))}
       </section>
 
       {leaderboardRows.length > 0 ? (
-        <Card className="rounded-3xl py-2 shadow-sm">
+        <Card className="rounded-2xl py-2 shadow-sm md:rounded-3xl">
           <CardContent className="px-0">
             <LeaderboardTable rows={leaderboardRows} ranked />
           </CardContent>
         </Card>
       ) : (
-        <Card className="min-h-44 place-items-center justify-center rounded-3xl text-center shadow-sm">
-          <CardHeader>
+        <Card className="min-h-44 place-items-center justify-center rounded-2xl text-center shadow-sm md:rounded-3xl">
+          <CardHeader className="w-full">
             <CardTitle>Belum ada catatan game</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">Tidak ada statistik untuk {formatMonthLabel(selectedMonth)}.</CardContent>
+          <CardContent className="w-full text-sm text-muted-foreground">Tidak ada statistik untuk {formatMonthLabel(selectedMonth)}.</CardContent>
         </Card>
       )}
     </section>
+  )
+}
+
+function compareExportPlayers(left: PlayerCard, right: PlayerCard) {
+  if (right.points !== left.points) return right.points - left.points
+
+  const parseCoefficient = (value: string) => (
+    value.startsWith('(') && value.endsWith(')')
+      ? -Number(value.slice(1, -1))
+      : Number(value)
+  )
+  const coefficientDiff = parseCoefficient(right.coefficient) - parseCoefficient(left.coefficient)
+  if (coefficientDiff !== 0) return coefficientDiff
+
+  const leftWinRate = left.games === 0 ? 0 : left.wins / left.games
+  const rightWinRate = right.games === 0 ? 0 : right.wins / right.games
+  if (rightWinRate !== leftWinRate) return rightWinRate - leftWinRate
+
+  if (right.wins !== left.wins) return right.wins - left.wins
+
+  return left.name.localeCompare(right.name)
+}
+
+const EXPORT_MAX_ROWS = 50
+
+function buildExportRows(players: PlayerCard[]) {
+  const active = players.filter((player) => player.games > 0).sort(compareExportPlayers)
+  const inactive = players.filter((player) => player.games === 0).sort((left, right) => left.name.localeCompare(right.name))
+  return [...active, ...inactive].slice(0, EXPORT_MAX_ROWS)
+}
+
+function LeaderboardImageExport({ players, selectedMonth, exportRef }: {
+  players: PlayerCard[]
+  selectedMonth: string
+  exportRef: RefObject<HTMLDivElement | null>
+}) {
+  const exportRows = useMemo(() => buildExportRows(players), [players])
+  const title = `KLASEMEN ${formatMonthLabel(selectedMonth).toUpperCase()} BIAWAK KOL GAMES`
+
+  return (
+    <div
+      className="pointer-events-none fixed left-[-10000px] top-0"
+      aria-hidden="true"
+    >
+      <div
+        ref={exportRef}
+        data-testid="leaderboard-image-export"
+        className="relative w-[610px] overflow-hidden bg-white text-black"
+        style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
+      >
+        <img
+          src="/brand/biawak-kol-vertical.webp"
+          alt=""
+          className="absolute left-1/2 top-[52%] w-[500px] -translate-x-1/2 -translate-y-1/2 opacity-25"
+        />
+        <table className="relative z-10 w-full border-collapse text-[13px] leading-tight">
+          <thead>
+            <tr className="bg-[#ffff00] text-black">
+              <th colSpan={8} className="border border-black px-1 py-1 text-center text-[22px] font-black uppercase">
+                {title}
+              </th>
+            </tr>
+            <tr className="bg-[#ffff00] text-black">
+              <th className="w-[34px] border border-black px-1 py-1 text-center font-bold">NO</th>
+              <th className="w-[110px] border border-black px-2 py-1 text-left font-bold">NAMA</th>
+              <th className="w-[75px] border border-black px-1 py-1 text-center font-bold">JUMLAH<br />TANDING</th>
+              <th className="w-[75px] border border-black px-1 py-1 text-center font-bold">JUMLAH<br />MENANG</th>
+              <th className="w-[75px] border border-black px-1 py-1 text-center font-bold">JUMLAH<br />KALAH</th>
+              <th className="w-[75px] border border-black px-1 py-1 text-center font-bold">JUMLAH<br />POIN</th>
+              <th className="w-[75px] border border-black px-1 py-1 text-center font-bold">JUMLAH<br />KOEFISIEN</th>
+              <th className="w-[90px] border border-black px-1 py-1 text-center font-bold">PERSENTASE<br />MENANG</th>
+            </tr>
+          </thead>
+          <tbody>
+            {exportRows.map((player, index) => {
+              const isInactive = player.games === 0
+              const emptyValue = isInactive ? '-' : null
+
+              return (
+                <tr key={player.id} className="bg-transparent text-black">
+                  <td className="border border-black px-1 py-1 text-right">{index + 1}</td>
+                  <td className="border border-black px-2 py-1 text-left uppercase">{player.name}</td>
+                  <td className="border border-black px-1 py-1 text-right">{emptyValue ?? player.games}</td>
+                  <td className="border border-black px-1 py-1 text-right">{emptyValue ?? player.wins}</td>
+                  <td className="border border-black px-1 py-1 text-right">{emptyValue ?? player.losses}</td>
+                  <td className="border border-black px-1 py-1 text-right">{emptyValue ?? player.points}</td>
+                  <td className="border border-black px-1 py-1 text-right">{emptyValue ?? player.coefficient}</td>
+                  <td className="border border-black px-1 py-1 text-right">{player.winRate}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
 
@@ -778,20 +1014,35 @@ function LeaderboardTable({ rows, ranked = false }: { rows: LeaderboardRow[]; ra
         </TableRow>
       </TableHeader>
       <TableBody>
-        {rows.map((player, index) => (
-          <TableRow key={player.name}>
-            {ranked && <TableCell className="font-medium">{index + 1}</TableCell>}
-            <TableCell>
-              <span className="flex items-center gap-2 font-medium"><PlayerAvatar name={player.name} />{player.name}</span>
-            </TableCell>
-            <TableCell>{player.games}</TableCell>
-            <TableCell>{player.wins}</TableCell>
-            <TableCell>{player.losses}</TableCell>
-            <TableCell className="font-semibold">{player.points}</TableCell>
-            <TableCell>{player.coefficient}</TableCell>
-            <TableCell><Badge variant="secondary">{player.winRate}</Badge></TableCell>
-          </TableRow>
-        ))}
+        {rows.map((player, index) => {
+          const rank = index + 1
+          const rankClassName = cn(
+            'inline-grid h-7 min-w-7 place-items-center px-1.5 text-[11px] font-semibold tabular-nums',
+            rank === 1 && 'text-yellow-700',
+            rank === 2 && 'text-zinc-500',
+            rank === 3 && 'text-orange-700',
+            rank > 3 && 'text-foreground',
+          )
+
+          return (
+            <TableRow key={player.name}>
+              {ranked && (
+                <TableCell className="font-medium">
+                  <span className={rankClassName}>{rank}</span>
+                </TableCell>
+              )}
+              <TableCell>
+                <span className="flex items-center gap-2 font-medium"><PlayerAvatar name={player.name} />{player.name}</span>
+              </TableCell>
+              <TableCell>{player.games}</TableCell>
+              <TableCell>{player.wins}</TableCell>
+              <TableCell>{player.losses}</TableCell>
+              <TableCell className="font-semibold">{player.points}</TableCell>
+              <TableCell>{player.coefficient}</TableCell>
+              <TableCell><Badge variant="secondary">{player.winRate}</Badge></TableCell>
+            </TableRow>
+          )
+        })}
       </TableBody>
     </Table>
   )
@@ -1025,10 +1276,10 @@ function HistoryScreen({ games, monthOptions, selectedMonth, onMonthChange, onEd
       <div className="grid gap-3">
         {games.length === 0 && (
           <Card className="min-h-44 place-items-center justify-center rounded-3xl text-center shadow-sm">
-            <CardHeader>
+            <CardHeader className="w-full">
               <CardTitle>Belum ada riwayat game</CardTitle>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">Tidak ada game untuk {formatMonthLabel(selectedMonth)}.</CardContent>
+            <CardContent className="w-full text-sm text-muted-foreground">Tidak ada game untuk {formatMonthLabel(selectedMonth)}.</CardContent>
           </Card>
         )}
         {games.map((game) => (
@@ -1175,12 +1426,14 @@ function PlayerDetailSheet({ open, player, onClose }: { open: boolean; player: P
         aria-modal="true"
         aria-labelledby="player-sheet-title"
       >
-        <div className="sticky top-0 z-10 flex items-center justify-center border-b bg-card px-4 py-3">
+        <button
+          type="button"
+          className="sticky top-0 z-10 flex w-full cursor-pointer items-center justify-center border-b bg-card px-4 py-3"
+          aria-label="Tutup detail"
+          onClick={onClose}
+        >
           <div className="h-1.5 w-12 rounded-full bg-muted" />
-          <Button type="button" variant="ghost" size="icon-sm" className="absolute right-2 top-1/2 -translate-y-1/2" aria-label="Tutup detail" onClick={onClose}>
-            <XIcon size={20} />
-          </Button>
-        </div>
+        </button>
         <div className="overflow-y-auto p-4">
           <PlayerDetail player={player} />
         </div>

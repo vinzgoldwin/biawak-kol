@@ -89,3 +89,15 @@ export function TrashIcon(props: IconProps) {
 export function XIcon(props: IconProps) {
   return <IconBase {...props}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></IconBase>
 }
+
+export function ImageIcon(props: IconProps) {
+  return <IconBase {...props}><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></IconBase>
+}
+
+export function CopyIcon(props: IconProps) {
+  return <IconBase {...props}><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></IconBase>
+}
+
+export function DownloadIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" /></IconBase>
+}
