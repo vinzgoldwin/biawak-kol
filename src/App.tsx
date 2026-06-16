@@ -345,7 +345,7 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
       <div className="tabs"><button type="button">Riwayat</button><button className="is-active" type="button">Pemain</button></div>
       <label className="search-box"><span>Cari</span><input value={playerQuery} placeholder="Cari atau tambah pemain..." onChange={(event) => onSearchChange(event.target.value)} /></label>
       <button type="button" className="primary-button save-button" onClick={onAddPlayer}>+ Tambah Pemain</button>
-      <div className="players-layout"><section className="card player-list-card">{players.map((player, index) => <button key={player.id} type="button" className={`player-row ${selectedPlayerId === player.id ? 'is-active' : ''}`} onClick={() => onSelectPlayer(player.id)}><Avatar name={player.name} seed={index} /><div><strong>{player.name}</strong><span>{player.games} game - {player.winRate} menang</span></div><em>{player.active ? 'Aktif' : 'Baru'}</em></button>)}</section><PlayerDetail player={selectedPlayer} /></div>
+      <div className="players-layout"><section className="card player-list-card">{players.map((player, index) => <button key={player.id} type="button" className={`player-row ${selectedPlayerId === player.id ? 'is-active' : ''}`} onClick={() => onSelectPlayer(player.id)}><Avatar name={player.name} seed={index} /><div><strong>{player.name}</strong><span>{player.games} game - {player.winRate} menang</span></div></button>)}</section><PlayerDetail player={selectedPlayer} /></div>
     </section>
   )
 }
