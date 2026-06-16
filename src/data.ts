@@ -36,17 +36,17 @@ export type PlayerCard = {
 }
 
 export const navItems: Array<{ id: NavKey; label: string; icon: string }> = [
-  { id: 'dashboard', label: 'Dashboard', icon: '◧' },
-  { id: 'record', label: 'Record', icon: '◎' },
-  { id: 'history', label: 'History', icon: '◫' },
-  { id: 'players', label: 'Players', icon: '◌' },
+  { id: 'dashboard', label: 'Beranda', icon: '◧' },
+  { id: 'record', label: 'Catat', icon: '◎' },
+  { id: 'history', label: 'Riwayat', icon: '◫' },
+  { id: 'players', label: 'Pemain', icon: '◌' },
 ]
 
 export const summaryStats = [
-  { label: 'Total Games', value: '12' },
-  { label: 'Active Players', value: '15' },
-  { label: 'Top Player', value: 'Kevin' },
-  { label: 'Best Win Rate', value: '86%' },
+  { label: 'Total Game', value: '12' },
+  { label: 'Pemain Aktif', value: '15' },
+  { label: 'Pemain Teratas', value: 'Kevin' },
+  { label: 'Persen Menang Terbaik', value: '86%' },
 ]
 
 export const leaderboardQualified: LeaderboardRow[] = [
@@ -177,9 +177,9 @@ export const playerDirectory: PlayerCard[] = [
     coefficient: '2.11',
     winRate: '78%',
     recentGames: [
-      { label: '16 Jun 2026 vs Team B', result: 'W +3' },
-      { label: '13 Jun 2026 vs Team A', result: 'L -1' },
-      { label: '10 Jun 2026 vs Team B', result: 'W +3' },
+      { label: '16 Jun 2026 vs Tim B', result: 'M +3' },
+      { label: '13 Jun 2026 vs Tim A', result: 'K -1' },
+      { label: '10 Jun 2026 vs Tim B', result: 'M +3' },
     ],
   },
   {
@@ -193,9 +193,9 @@ export const playerDirectory: PlayerCard[] = [
     coefficient: '2.43',
     winRate: '86%',
     recentGames: [
-      { label: '10 Jun 2026 vs Team B', result: 'W +3' },
-      { label: '8 Jun 2026 vs Team A', result: 'W +3' },
-      { label: '6 Jun 2026 vs Team B', result: 'L -1' },
+      { label: '10 Jun 2026 vs Tim B', result: 'M +3' },
+      { label: '8 Jun 2026 vs Tim A', result: 'M +3' },
+      { label: '6 Jun 2026 vs Tim B', result: 'K -1' },
     ],
   },
   {
@@ -209,9 +209,9 @@ export const playerDirectory: PlayerCard[] = [
     coefficient: '1.29',
     winRate: '57%',
     recentGames: [
-      { label: '13 Jun 2026 vs Team B', result: 'W +3' },
-      { label: '10 Jun 2026 vs Team A', result: 'W +3' },
-      { label: '7 Jun 2026 vs Team A', result: 'L -1' },
+      { label: '13 Jun 2026 vs Tim B', result: 'M +3' },
+      { label: '10 Jun 2026 vs Tim A', result: 'M +3' },
+      { label: '7 Jun 2026 vs Tim A', result: 'K -1' },
     ],
   },
   {
@@ -225,9 +225,9 @@ export const playerDirectory: PlayerCard[] = [
     coefficient: '1.29',
     winRate: '57%',
     recentGames: [
-      { label: '16 Jun 2026 vs Team B', result: 'W +3' },
-      { label: '13 Jun 2026 vs Team A', result: 'L -1' },
-      { label: '5 Jun 2026 vs Team B', result: 'W +3' },
+      { label: '16 Jun 2026 vs Tim B', result: 'M +3' },
+      { label: '13 Jun 2026 vs Tim A', result: 'K -1' },
+      { label: '5 Jun 2026 vs Tim B', result: 'M +3' },
     ],
   },
   {
@@ -241,8 +241,8 @@ export const playerDirectory: PlayerCard[] = [
     coefficient: '1.67',
     winRate: '67%',
     recentGames: [
-      { label: '16 Jun 2026 vs Team A', result: 'L -1' },
-      { label: '9 Jun 2026 vs Team B', result: 'W +3' },
+      { label: '16 Jun 2026 vs Tim A', result: 'K -1' },
+      { label: '9 Jun 2026 vs Tim B', result: 'M +3' },
     ],
   },
   {
@@ -256,8 +256,8 @@ export const playerDirectory: PlayerCard[] = [
     coefficient: '1.00',
     winRate: '50%',
     recentGames: [
-      { label: '16 Jun 2026 vs Team A', result: 'L -1' },
-      { label: '13 Jun 2026 vs Team B', result: 'W +3' },
+      { label: '16 Jun 2026 vs Tim A', result: 'K -1' },
+      { label: '13 Jun 2026 vs Tim B', result: 'M +3' },
     ],
   },
   {
@@ -270,7 +270,7 @@ export const playerDirectory: PlayerCard[] = [
     points: 3,
     coefficient: '3.00',
     winRate: '100%',
-    recentGames: [{ label: '8 Jun 2026 vs Team B', result: 'W +3' }],
+    recentGames: [{ label: '8 Jun 2026 vs Tim B', result: 'M +3' }],
   },
   {
     id: 'agus',
@@ -283,8 +283,8 @@ export const playerDirectory: PlayerCard[] = [
     coefficient: '1.00',
     winRate: '50%',
     recentGames: [
-      { label: '16 Jun 2026 vs Team B', result: 'W +3' },
-      { label: '13 Jun 2026 vs Team A', result: 'L -1' },
+      { label: '16 Jun 2026 vs Tim B', result: 'M +3' },
+      { label: '13 Jun 2026 vs Tim A', result: 'K -1' },
     ],
   },
   {
@@ -298,8 +298,8 @@ export const playerDirectory: PlayerCard[] = [
     coefficient: '1.00',
     winRate: '50%',
     recentGames: [
-      { label: '16 Jun 2026 vs Team B', result: 'W +3' },
-      { label: '13 Jun 2026 vs Team A', result: 'L -1' },
+      { label: '16 Jun 2026 vs Tim B', result: 'M +3' },
+      { label: '13 Jun 2026 vs Tim A', result: 'K -1' },
     ],
   },
   {
@@ -313,8 +313,8 @@ export const playerDirectory: PlayerCard[] = [
     coefficient: '1.00',
     winRate: '50%',
     recentGames: [
-      { label: '16 Jun 2026 vs Team B', result: 'W +3' },
-      { label: '13 Jun 2026 vs Team A', result: 'L -1' },
+      { label: '16 Jun 2026 vs Tim B', result: 'M +3' },
+      { label: '13 Jun 2026 vs Tim A', result: 'K -1' },
     ],
   },
   {
@@ -328,8 +328,8 @@ export const playerDirectory: PlayerCard[] = [
     coefficient: '0.33',
     winRate: '33%',
     recentGames: [
-      { label: '16 Jun 2026 vs Team A', result: 'L -1' },
-      { label: '13 Jun 2026 vs Team B', result: 'W +3' },
+      { label: '16 Jun 2026 vs Tim A', result: 'K -1' },
+      { label: '13 Jun 2026 vs Tim B', result: 'M +3' },
     ],
   },
   {
@@ -343,8 +343,8 @@ export const playerDirectory: PlayerCard[] = [
     coefficient: '0.33',
     winRate: '33%',
     recentGames: [
-      { label: '16 Jun 2026 vs Team A', result: 'L -1' },
-      { label: '10 Jun 2026 vs Team A', result: 'L -1' },
+      { label: '16 Jun 2026 vs Tim A', result: 'K -1' },
+      { label: '10 Jun 2026 vs Tim A', result: 'K -1' },
     ],
   },
   {
@@ -358,8 +358,8 @@ export const playerDirectory: PlayerCard[] = [
     coefficient: '1.00',
     winRate: '50%',
     recentGames: [
-      { label: '13 Jun 2026 vs Team B', result: 'W +3' },
-      { label: '10 Jun 2026 vs Team A', result: 'W +3' },
+      { label: '13 Jun 2026 vs Tim B', result: 'M +3' },
+      { label: '10 Jun 2026 vs Tim A', result: 'M +3' },
     ],
   },
   {
@@ -373,8 +373,8 @@ export const playerDirectory: PlayerCard[] = [
     coefficient: '1.00',
     winRate: '50%',
     recentGames: [
-      { label: '13 Jun 2026 vs Team B', result: 'W +3' },
-      { label: '10 Jun 2026 vs Team A', result: 'W +3' },
+      { label: '13 Jun 2026 vs Tim B', result: 'M +3' },
+      { label: '10 Jun 2026 vs Tim A', result: 'M +3' },
     ],
   },
   {
@@ -388,8 +388,8 @@ export const playerDirectory: PlayerCard[] = [
     coefficient: '1.00',
     winRate: '50%',
     recentGames: [
-      { label: '13 Jun 2026 vs Team B', result: 'W +3' },
-      { label: '10 Jun 2026 vs Team A', result: 'W +3' },
+      { label: '13 Jun 2026 vs Tim B', result: 'M +3' },
+      { label: '10 Jun 2026 vs Tim A', result: 'M +3' },
     ],
   },
   {
