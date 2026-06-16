@@ -3,34 +3,25 @@ import './index.css'
 import './icons.css'
 import {
   historySeed,
-  leaderboardQualified,
-  leaderboardUnqualified,
   navItems,
   playerDirectory,
-  recordPool,
-  summaryStats,
   type HistoryGame,
+  type LeaderboardRow,
   type NavKey,
   type PlayerCard,
+  type RosterPlayer,
 } from './data'
 import {
-  BarChartIcon,
   BellIcon,
-  CalendarIcon,
   CheckCircleIcon,
-  CheckIcon,
   HistoryIcon,
   HomeIcon,
   MenuIcon,
-  PencilIcon,
   PlusIcon,
-  SaveIcon,
-  SearchIcon,
-  TrashIcon,
-  TrophyIcon,
   UsersIcon,
   type IconComponent,
 } from './icons'
+import { buildDashboardSummary, buildLeaderboard, buildPlayerStats, type SummaryStat } from './stats'
 
 type Winner = 'A' | 'B'
 
@@ -60,13 +51,55 @@ const navIcon: Record<NavKey, IconComponent> = {
   players: UsersIcon,
 }
 
+const monthShortNames: Record<string, string> = {
+  Januari: 'Jan',
+  Februari: 'Feb',
+  Maret: 'Mar',
+  April: 'Apr',
+  Mei: 'Mei',
+  Juni: 'Jun',
+  Juli: 'Jul',
+  Agustus: 'Agu',
+  September: 'Sep',
+  Oktober: 'Okt',
+  November: 'Nov',
+  Desember: 'Des',
+}
+
+function toDateShort(dateLabel: string) {
+  const [day, month, year] = dateLabel.trim().split(/\s+/)
+  if (!day || !month || !year) return dateLabel
+
+  return `${day} ${monthShortNames[month] ?? month.slice(0, 3)} ${year}`
+}
+
+function createHistoryGame(recordState: RecordState, historyGames: HistoryGame[]): HistoryGame | null {
+  if (recordState.winner === null) return null
+
+  return {
+    id: Math.max(0, ...historyGames.map((game) => game.id)) + 1,
+    dateLabel: recordState.dateLabel,
+    dateShort: toDateShort(recordState.dateLabel),
+    winner: recordState.winner,
+    teamA: [...recordState.teamA],
+    teamB: [...recordState.teamB],
+  }
+}
+
 function App() {
   const [activeScreen, setActiveScreen] = useState<NavKey>('dashboard')
   const [recordState, setRecordState] = useState<RecordState>(initialRecordState)
   const [historyGames, setHistoryGames] = useState(historySeed)
-  const [players, setPlayers] = useState(playerDirectory)
+  const [rosterPlayers, setRosterPlayers] = useState<RosterPlayer[]>(playerDirectory)
   const [selectedPlayerId, setSelectedPlayerId] = useState('kevin')
   const [playerQuery, setPlayerQuery] = useState('')
+
+  const computedPlayers = useMemo(() => buildPlayerStats(rosterPlayers, historyGames), [historyGames, rosterPlayers])
+  const leaderboard = useMemo(() => buildLeaderboard(computedPlayers), [computedPlayers])
+  const dashboardSummaryStats = useMemo(
+    () => buildDashboardSummary(historyGames, computedPlayers, leaderboard),
+    [computedPlayers, historyGames, leaderboard],
+  )
 
   const assignedPlayers = useMemo(
     () => new Set([...recordState.teamA, ...recordState.teamB]),
@@ -75,15 +108,17 @@ function App() {
 
   const availablePlayers = useMemo(() => {
     const query = recordState.search.trim().toLowerCase()
-    return recordPool.filter((player) => !assignedPlayers.has(player) && (query === '' || player.toLowerCase().includes(query)))
-  }, [assignedPlayers, recordState.search])
+    return rosterPlayers
+      .map((player) => player.name)
+      .filter((player) => !assignedPlayers.has(player) && (query === '' || player.toLowerCase().includes(query)))
+  }, [assignedPlayers, recordState.search, rosterPlayers])
 
   const filteredPlayers = useMemo(() => {
     const query = playerQuery.trim().toLowerCase()
-    return players.filter((player) => query === '' || player.name.toLowerCase().includes(query))
-  }, [playerQuery, players])
+    return computedPlayers.filter((player) => query === '' || player.name.toLowerCase().includes(query))
+  }, [computedPlayers, playerQuery])
 
-  const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? players[0]
+  const selectedPlayer = computedPlayers.find((player) => player.id === selectedPlayerId) ?? computedPlayers[0]
   const teamsEven = recordState.teamA.length === recordState.teamB.length
   const teamsFull = recordState.teamA.length === recordState.teamSize && recordState.teamB.length === recordState.teamSize
   const canSave = teamsEven && teamsFull && recordState.winner !== null
@@ -118,29 +153,27 @@ function App() {
   }
 
   const saveGame = () => {
-    if (canSave) setActiveScreen('saved')
+    if (!canSave) return
+
+    const savedGame = createHistoryGame(recordState, historyGames)
+    if (savedGame === null) return
+
+    setHistoryGames((current) => [savedGame, ...current])
+    setActiveScreen('saved')
   }
 
   const addPlayer = () => {
     const trimmed = playerQuery.trim()
     if (!trimmed) return
     const id = trimmed.toLowerCase().replace(/\s+/g, '-')
-    if (players.some((player) => player.id === id)) return
+    if (rosterPlayers.some((player) => player.id === id || player.name.toLowerCase() === trimmed.toLowerCase())) return
 
-    const nextPlayer: PlayerCard = {
+    const nextPlayer: RosterPlayer = {
       id,
       name: trimmed,
-      active: false,
-      games: 0,
-      wins: 0,
-      losses: 0,
-      points: 0,
-      coefficient: '0.00',
-      winRate: '0%',
-      recentGames: [],
     }
 
-    setPlayers((current) => [nextPlayer, ...current])
+    setRosterPlayers((current) => [nextPlayer, ...current])
     setSelectedPlayerId(id)
     setPlayerQuery('')
   }
@@ -154,12 +187,19 @@ function App() {
 
       <main className="app-main">
         <header className="mobile-topbar">
-          <button type="button" className="icon-button" aria-label="Buka menu">Menu</button>
+          <button type="button" className="icon-button" aria-label="Buka menu"><MenuIcon size={18} /></button>
           <Brand />
-          <button type="button" className="icon-button" aria-label="Notifikasi">Notif</button>
+          <button type="button" className="icon-button" aria-label="Notifikasi"><BellIcon size={18} /></button>
         </header>
 
-        {activeScreen === 'dashboard' && <DashboardScreen onRecordNewGame={() => setActiveScreen('record')} />}
+        {activeScreen === 'dashboard' && (
+          <DashboardScreen
+            summaryStats={dashboardSummaryStats}
+            leaderboardQualified={leaderboard.qualified}
+            leaderboardUnqualified={leaderboard.unqualified}
+            onRecordNewGame={() => setActiveScreen('record')}
+          />
+        )}
         {activeScreen === 'record' && (
           <RecordScreen
             recordState={recordState}
@@ -202,12 +242,16 @@ function App() {
 function Nav({ activeScreen, onNavigate, variant }: { activeScreen: NavKey; onNavigate: (screen: NavKey) => void; variant: 'side' | 'bottom' }) {
   return (
     <nav className={variant === 'side' ? 'side-nav' : 'bottom-nav'} aria-label="Navigasi utama">
-      {navItems.map((item) => (
-        <button key={item.id} type="button" className={`${variant === 'side' ? 'nav-item' : 'bottom-nav-item'} ${activeScreen === item.id ? 'is-active' : ''}`} onClick={() => onNavigate(item.id)}>
-          <span>{navIcon[item.id]}</span>
-          {item.label}
-        </button>
-      ))}
+      {navItems.map((item) => {
+        const Icon = navIcon[item.id]
+
+        return (
+          <button key={item.id} type="button" className={`${variant === 'side' ? 'nav-item' : 'bottom-nav-item'} ${activeScreen === item.id ? 'is-active' : ''}`} onClick={() => onNavigate(item.id)}>
+            <span><Icon size={18} /></span>
+            {item.label}
+          </button>
+        )
+      })}
     </nav>
   )
 }
@@ -224,7 +268,12 @@ function Brand({ compact = false }: { compact?: boolean }) {
   )
 }
 
-function DashboardScreen({ onRecordNewGame }: { onRecordNewGame: () => void }) {
+function DashboardScreen({ summaryStats, leaderboardQualified, leaderboardUnqualified, onRecordNewGame }: {
+  summaryStats: SummaryStat[]
+  leaderboardQualified: LeaderboardRow[]
+  leaderboardUnqualified: LeaderboardRow[]
+  onRecordNewGame: () => void
+}) {
   return (
     <section className="screen dashboard-screen">
       <div className="toolbar-card">
@@ -255,7 +304,7 @@ function DashboardScreen({ onRecordNewGame }: { onRecordNewGame: () => void }) {
   )
 }
 
-function LeaderboardTable({ rows, ranked = false }: { rows: typeof leaderboardQualified; ranked?: boolean }) {
+function LeaderboardTable({ rows, ranked = false }: { rows: LeaderboardRow[]; ranked?: boolean }) {
   return (
     <div className="leaderboard-table" role="table">
       <div className="table-head" role="row">
