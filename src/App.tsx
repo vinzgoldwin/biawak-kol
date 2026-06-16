@@ -14,29 +14,20 @@ import {
   type PlayerCard,
 } from './data'
 import {
-  BarChartIcon,
-  BellIcon,
-  CalendarIcon,
   CheckCircleIcon,
-  CheckIcon,
   HistoryIcon,
   HomeIcon,
-  MenuIcon,
-  PencilIcon,
   PlusIcon,
-  SaveIcon,
-  SearchIcon,
-  TrashIcon,
-  TrophyIcon,
   UsersIcon,
   type IconComponent,
 } from './icons'
 
 type Winner = 'A' | 'B'
 
+const TEAM_SIZE = 5
+
 type RecordState = {
   dateLabel: string
-  teamSize: number
   search: string
   teamA: string[]
   teamB: string[]
@@ -45,7 +36,6 @@ type RecordState = {
 
 const initialRecordState: RecordState = {
   dateLabel: '16 Juni 2026',
-  teamSize: 5,
   search: '',
   teamA: ['Kevin', 'AAL', 'Agus', 'Johan', 'BG Frans'],
   teamB: ['Alun', 'Koyok', 'BG Hendra', 'Syaili', 'Hengki'],
@@ -85,14 +75,14 @@ function App() {
 
   const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? players[0]
   const teamsEven = recordState.teamA.length === recordState.teamB.length
-  const teamsFull = recordState.teamA.length === recordState.teamSize && recordState.teamB.length === recordState.teamSize
+  const teamsFull = recordState.teamA.length === TEAM_SIZE && recordState.teamB.length === TEAM_SIZE
   const canSave = teamsEven && teamsFull && recordState.winner !== null
 
   const addPlayerToTeam = (playerName: string, team: Winner) => {
     setRecordState((current) => {
       const targetKey = team === 'A' ? 'teamA' : 'teamB'
       const targetTeam = current[targetKey]
-      if (targetTeam.length >= current.teamSize) return current
+      if (targetTeam.length >= TEAM_SIZE) return current
       if (current.teamA.includes(playerName) || current.teamB.includes(playerName)) return current
       return { ...current, [targetKey]: [...targetTeam, playerName] }
     })
@@ -108,7 +98,6 @@ function App() {
   const loadGameIntoRecorder = (game: HistoryGame) => {
     setRecordState({
       dateLabel: game.dateLabel,
-      teamSize: Math.max(game.teamA.length, game.teamB.length),
       search: '',
       teamA: [...game.teamA],
       teamB: [...game.teamB],
@@ -168,9 +157,6 @@ function App() {
             canSave={canSave}
             onSearchChange={(search) => setRecordState((current) => ({ ...current, search }))}
             onDateChange={(dateLabel) => setRecordState((current) => ({ ...current, dateLabel }))}
-            onTeamSizeChange={(teamSize) =>
-              setRecordState((current) => ({ ...current, teamSize, teamA: current.teamA.slice(0, teamSize), teamB: current.teamB.slice(0, teamSize) }))
-            }
             onAddPlayer={addPlayerToTeam}
             onRemovePlayer={removePlayerFromTeam}
             onWinnerChange={(winner) => setRecordState((current) => ({ ...current, winner }))}
@@ -202,12 +188,15 @@ function App() {
 function Nav({ activeScreen, onNavigate, variant }: { activeScreen: NavKey; onNavigate: (screen: NavKey) => void; variant: 'side' | 'bottom' }) {
   return (
     <nav className={variant === 'side' ? 'side-nav' : 'bottom-nav'} aria-label="Navigasi utama">
-      {navItems.map((item) => (
-        <button key={item.id} type="button" className={`${variant === 'side' ? 'nav-item' : 'bottom-nav-item'} ${activeScreen === item.id ? 'is-active' : ''}`} onClick={() => onNavigate(item.id)}>
-          <span>{navIcon[item.id]}</span>
-          {item.label}
-        </button>
-      ))}
+      {navItems.map((item) => {
+        const Icon = navIcon[item.id]
+        return (
+          <button key={item.id} type="button" className={`${variant === 'side' ? 'nav-item' : 'bottom-nav-item'} ${activeScreen === item.id ? 'is-active' : ''}`} onClick={() => onNavigate(item.id)}>
+            <span><Icon /></span>
+            {item.label}
+          </button>
+        )
+      })}
     </nav>
   )
 }
@@ -273,14 +262,13 @@ function LeaderboardTable({ rows, ranked = false }: { rows: typeof leaderboardQu
   )
 }
 
-function RecordScreen({ recordState, availablePlayers, teamsEven, canSave, onSearchChange, onDateChange, onTeamSizeChange, onAddPlayer, onRemovePlayer, onWinnerChange, onSave }: {
+function RecordScreen({ recordState, availablePlayers, teamsEven, canSave, onSearchChange, onDateChange, onAddPlayer, onRemovePlayer, onWinnerChange, onSave }: {
   recordState: RecordState
   availablePlayers: string[]
   teamsEven: boolean
   canSave: boolean
   onSearchChange: (value: string) => void
   onDateChange: (value: string) => void
-  onTeamSizeChange: (size: number) => void
   onAddPlayer: (playerName: string, team: Winner) => void
   onRemovePlayer: (playerName: string, team: Winner) => void
   onWinnerChange: (winner: Winner) => void
@@ -289,9 +277,8 @@ function RecordScreen({ recordState, availablePlayers, teamsEven, canSave, onSea
   return (
     <section className="screen record-screen">
       <div className="page-title"><h1>Catat Game</h1></div>
-      <div className="form-grid two-columns">
+      <div className="form-grid">
         <label className="field-card"><span>Tanggal</span><input value={recordState.dateLabel} onChange={(event) => onDateChange(event.target.value)} /></label>
-        <label className="field-card"><span>Ukuran Tim</span><select value={recordState.teamSize} onChange={(event) => onTeamSizeChange(Number(event.target.value))}><option value={3}>3 v 3</option><option value={4}>4 v 4</option><option value={5}>5 v 5</option></select></label>
       </div>
       <label className="search-box"><span>Cari</span><input value={recordState.search} placeholder="Cari pemain..." onChange={(event) => onSearchChange(event.target.value)} /></label>
       <section className="available-section">
@@ -306,8 +293,8 @@ function RecordScreen({ recordState, availablePlayers, teamsEven, canSave, onSea
         </div>
       </section>
       <div className="teams-grid">
-        <TeamBox title="Tim A" tone="blue" players={recordState.teamA} teamSize={recordState.teamSize} onRemove={(name) => onRemovePlayer(name, 'A')} />
-        <TeamBox title="Tim B" tone="red" players={recordState.teamB} teamSize={recordState.teamSize} onRemove={(name) => onRemovePlayer(name, 'B')} />
+        <TeamBox title="Tim A" tone="blue" players={recordState.teamA} teamSize={TEAM_SIZE} onRemove={(name) => onRemovePlayer(name, 'A')} />
+        <TeamBox title="Tim B" tone="red" players={recordState.teamB} teamSize={TEAM_SIZE} onRemove={(name) => onRemovePlayer(name, 'B')} />
       </div>
       <section className="winner-card"><h2>Pemenang</h2><div className="winner-toggle"><button type="button" className={recordState.winner === 'A' ? 'is-active' : ''} onClick={() => onWinnerChange('A')}>Tim A</button><button type="button" className={recordState.winner === 'B' ? 'is-active' : ''} onClick={() => onWinnerChange('B')}>Tim B</button></div></section>
       <p className={`save-status ${teamsEven ? 'is-ready' : 'is-error'}`}>{teamsEven ? 'Jumlah pemain seimbang. Siap disimpan!' : 'Jumlah pemain belum seimbang. Benarkan tim dulu.'}</p>
