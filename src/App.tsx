@@ -154,9 +154,9 @@ function App() {
 
       <main className="app-main">
         <header className="mobile-topbar">
-          <button type="button" className="icon-button" aria-label="Menu"><MenuIcon size={21} /></button>
+          <button type="button" className="icon-button" aria-label="Buka menu">Menu</button>
           <Brand />
-          <button type="button" className="icon-button" aria-label="Alerts"><BellIcon size={20} /></button>
+          <button type="button" className="icon-button" aria-label="Notifikasi">Notif</button>
         </header>
 
         {activeScreen === 'dashboard' && <DashboardScreen onRecordNewGame={() => setActiveScreen('record')} />}
@@ -201,16 +201,13 @@ function App() {
 
 function Nav({ activeScreen, onNavigate, variant }: { activeScreen: NavKey; onNavigate: (screen: NavKey) => void; variant: 'side' | 'bottom' }) {
   return (
-    <nav className={variant === 'side' ? 'side-nav' : 'bottom-nav'} aria-label="Navigation">
-      {navItems.map((item) => {
-        const Icon = navIcon[item.id]
-        return (
-          <button key={item.id} type="button" className={`${variant === 'side' ? 'nav-item' : 'bottom-nav-item'} ${activeScreen === item.id ? 'is-active' : ''}`} onClick={() => onNavigate(item.id)}>
-            <span className="nav-icon"><Icon size={variant === 'side' ? 17 : 20} strokeWidth={2.25} /></span>
-            {item.label}
-          </button>
-        )
-      })}
+    <nav className={variant === 'side' ? 'side-nav' : 'bottom-nav'} aria-label="Navigasi utama">
+      {navItems.map((item) => (
+        <button key={item.id} type="button" className={`${variant === 'side' ? 'nav-item' : 'bottom-nav-item'} ${activeScreen === item.id ? 'is-active' : ''}`} onClick={() => onNavigate(item.id)}>
+          <span>{navIcon[item.id]}</span>
+          {item.label}
+        </button>
+      ))}
     </nav>
   )
 }
@@ -221,7 +218,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
       <div className="brand-logo"><span>BK</span></div>
       <div>
         <strong>Biawak<br />Kol Games</strong>
-        {compact && <em>Casual Basketball Club</em>}
+        {compact && <em>Klub Basket Santai</em>}
       </div>
     </div>
   )
@@ -231,29 +228,29 @@ function DashboardScreen({ onRecordNewGame }: { onRecordNewGame: () => void }) {
   return (
     <section className="screen dashboard-screen">
       <div className="toolbar-card">
-        <button type="button" className="select-pill"><span className="button-content"><CalendarIcon size={16} />Juni 2026</span></button>
-        <button type="button" className="primary-button" onClick={onRecordNewGame}><span className="button-content"><PlusIcon size={18} />Record New Game</span></button>
+        <button type="button" className="select-pill">Juni 2026</button>
+        <button type="button" className="primary-button" onClick={onRecordNewGame}>+ Catat Game Baru</button>
       </div>
       <section className="stat-grid">
         {summaryStats.map((item) => (
           <article key={item.label} className="stat-card">
             <span>{item.label}</span>
-            <strong className={item.label === 'Best Win Rate' ? 'green-text' : ''}>{item.value}</strong>
+            <strong className={item.label === 'Persen Menang Terbaik' ? 'green-text' : ''}>{item.value}</strong>
           </article>
         ))}
       </section>
       <div className="chip-row">
-        <button type="button" className="chip is-active">All Players</button>
-        <button type="button" className="chip">Qualified Only</button>
-        <button type="button" className="chip">Minimum 5 Games</button>
-        <button type="button" className="chip">Sort: Points</button>
+        <button type="button" className="chip is-active">Semua Pemain</button>
+        <button type="button" className="chip">Sudah Lolos</button>
+        <button type="button" className="chip">Minimal 5 Game</button>
+        <button type="button" className="chip">Urut: Poin</button>
       </div>
       <section className="card table-card"><LeaderboardTable rows={leaderboardQualified} ranked /></section>
       <section className="card table-card compact-card">
-        <div className="section-title-row"><h2>Not Yet Qualified</h2><span>Minimum 5 games to qualify</span></div>
+        <div className="section-title-row"><h2>Belum Lolos</h2><span>Minimal 5 game untuk masuk ranking</span></div>
         <LeaderboardTable rows={leaderboardUnqualified} />
       </section>
-      <p className="footnote">Stats are automatic from recorded games.</p>
+      <p className="footnote">Statistik otomatis dihitung dari game yang dicatat.</p>
     </section>
   )
 }
@@ -262,8 +259,8 @@ function LeaderboardTable({ rows, ranked = false }: { rows: typeof leaderboardQu
   return (
     <div className="leaderboard-table" role="table">
       <div className="table-head" role="row">
-        {ranked && <span>Rank</span>}
-        <span>Player</span><span>G</span><span>W</span><span>L</span><span>Pts</span><span>Coef</span><span>Win %</span>
+        {ranked && <span>No</span>}
+        <span>Pemain</span><span>G</span><span>M</span><span>K</span><span>Poin</span><span>Koef</span><span>M%</span>
       </div>
       {rows.map((player, index) => (
         <div key={player.name} className="table-row" role="row">
@@ -291,14 +288,14 @@ function RecordScreen({ recordState, availablePlayers, teamsEven, canSave, onSea
 }) {
   return (
     <section className="screen record-screen">
-      <div className="page-title"><h1>Record Game</h1></div>
+      <div className="page-title"><h1>Catat Game</h1></div>
       <div className="form-grid two-columns">
-        <label className="field-card"><span className="field-label"><CalendarIcon size={15} />Date</span><input value={recordState.dateLabel} onChange={(event) => onDateChange(event.target.value)} /></label>
-        <label className="field-card"><span className="field-label"><UsersIcon size={15} />Team Size</span><select value={recordState.teamSize} onChange={(event) => onTeamSizeChange(Number(event.target.value))}><option value={3}>3 v 3</option><option value={4}>4 v 4</option><option value={5}>5 v 5</option></select></label>
+        <label className="field-card"><span>Tanggal</span><input value={recordState.dateLabel} onChange={(event) => onDateChange(event.target.value)} /></label>
+        <label className="field-card"><span>Ukuran Tim</span><select value={recordState.teamSize} onChange={(event) => onTeamSizeChange(Number(event.target.value))}><option value={3}>3 v 3</option><option value={4}>4 v 4</option><option value={5}>5 v 5</option></select></label>
       </div>
-      <label className="search-box"><span className="search-icon"><SearchIcon size={18} /></span><input value={recordState.search} placeholder="Search players..." onChange={(event) => onSearchChange(event.target.value)} /></label>
+      <label className="search-box"><span>Cari</span><input value={recordState.search} placeholder="Cari pemain..." onChange={(event) => onSearchChange(event.target.value)} /></label>
       <section className="available-section">
-        <div className="section-title-row"><h2>Available Players</h2><span>tap A or B</span></div>
+        <div className="section-title-row"><h2>Pemain Tersedia</h2><span>tap A atau B</span></div>
         <div className="player-pill-grid">
           {availablePlayers.map((player, index) => (
             <div key={player} className="assign-player-card">
@@ -309,12 +306,12 @@ function RecordScreen({ recordState, availablePlayers, teamsEven, canSave, onSea
         </div>
       </section>
       <div className="teams-grid">
-        <TeamBox title="Team A" tone="blue" players={recordState.teamA} teamSize={recordState.teamSize} onRemove={(name) => onRemovePlayer(name, 'A')} />
-        <TeamBox title="Team B" tone="red" players={recordState.teamB} teamSize={recordState.teamSize} onRemove={(name) => onRemovePlayer(name, 'B')} />
+        <TeamBox title="Tim A" tone="blue" players={recordState.teamA} teamSize={recordState.teamSize} onRemove={(name) => onRemovePlayer(name, 'A')} />
+        <TeamBox title="Tim B" tone="red" players={recordState.teamB} teamSize={recordState.teamSize} onRemove={(name) => onRemovePlayer(name, 'B')} />
       </div>
-      <section className="winner-card"><h2>Winner</h2><div className="winner-toggle"><button type="button" className={recordState.winner === 'A' ? 'is-active' : ''} onClick={() => onWinnerChange('A')}><span className="button-content"><TrophyIcon size={17} />Team A</span></button><button type="button" className={recordState.winner === 'B' ? 'is-active' : ''} onClick={() => onWinnerChange('B')}><span className="button-content"><TrophyIcon size={17} />Team B</span></button></div></section>
-      <p className={`save-status ${teamsEven ? 'is-ready' : 'is-error'}`}><CheckCircleIcon size={16} />{teamsEven ? 'Teams are even. Ready to save!' : 'Teams are uneven. Fix team size first.'}</p>
-      <button type="button" className="primary-button save-button" disabled={!canSave} onClick={onSave}><span className="button-content"><SaveIcon size={18} />Save Game</span></button>
+      <section className="winner-card"><h2>Pemenang</h2><div className="winner-toggle"><button type="button" className={recordState.winner === 'A' ? 'is-active' : ''} onClick={() => onWinnerChange('A')}>Tim A</button><button type="button" className={recordState.winner === 'B' ? 'is-active' : ''} onClick={() => onWinnerChange('B')}>Tim B</button></div></section>
+      <p className={`save-status ${teamsEven ? 'is-ready' : 'is-error'}`}>{teamsEven ? 'Jumlah pemain seimbang. Siap disimpan!' : 'Jumlah pemain belum seimbang. Benarkan tim dulu.'}</p>
+      <button type="button" className="primary-button save-button" disabled={!canSave} onClick={onSave}>Simpan Game</button>
     </section>
   )
 }
@@ -325,7 +322,7 @@ function TeamBox({ title, tone, players, teamSize, onRemove }: { title: string; 
       <header><h2>{title}</h2><span>{players.length}</span></header>
       <div className="team-list">
         {players.map((player, index) => <button key={player} type="button" onClick={() => onRemove(player)}><Avatar name={player} seed={index} />{player}<span>x</span></button>)}
-        {Array.from({ length: Math.max(teamSize - players.length, 0) }).map((_, index) => <div key={index} className="empty-slot">Empty slot</div>)}
+        {Array.from({ length: Math.max(teamSize - players.length, 0) }).map((_, index) => <div key={index} className="empty-slot">Slot kosong</div>)}
       </div>
     </section>
   )
@@ -336,11 +333,11 @@ function SavedScreen({ recordState, onRecordAgain, onViewLeaderboard }: { record
   const losingPlayers = recordState.winner === 'A' ? recordState.teamB : recordState.teamA
   return (
     <section className="screen saved-screen">
-      <div className="success-icon"><CheckIcon size={54} strokeWidth={3} /></div><h1>Game saved</h1><p>Great game! Stats updated.</p>
-      <div className="saved-match-card"><SavedTeam label="Winning Team" title={recordState.winner === 'A' ? 'Team A' : 'Team B'} players={winningPlayers} winner /><div className="versus">VS</div><SavedTeam label="Losing Team" title={recordState.winner === 'A' ? 'Team B' : 'Team A'} players={losingPlayers} /></div>
-      <div className="points-grid"><div><span>Winners</span><strong className="green-text">+3</strong></div><div><span>Losers</span><strong className="red-text">-1</strong></div></div>
-      <button type="button" className="primary-button save-button" onClick={onRecordAgain}><span className="button-content"><PlusIcon size={18} />Record Another Game</span></button>
-      <button type="button" className="secondary-button save-button" onClick={onViewLeaderboard}><span className="button-content"><BarChartIcon size={18} />View Leaderboard</span></button>
+      <div className="success-icon">OK</div><h1>Game tersimpan</h1><p>Mantap! Statistik sudah diperbarui.</p>
+      <div className="saved-match-card"><SavedTeam label="Tim Menang" title={recordState.winner === 'A' ? 'Tim A' : 'Tim B'} players={winningPlayers} winner /><div className="versus">VS</div><SavedTeam label="Tim Kalah" title={recordState.winner === 'A' ? 'Tim B' : 'Tim A'} players={losingPlayers} /></div>
+      <div className="points-grid"><div><span>Pemenang</span><strong className="green-text">+3</strong></div><div><span>Kalah</span><strong className="red-text">-1</strong></div></div>
+      <button type="button" className="primary-button save-button" onClick={onRecordAgain}>+ Catat Game Lagi</button>
+      <button type="button" className="secondary-button save-button" onClick={onViewLeaderboard}>Lihat Ranking</button>
     </section>
   )
 }
@@ -352,11 +349,11 @@ function SavedTeam({ label, title, players, winner = false }: { label: string; t
 function HistoryScreen({ games, onEdit, onRemove }: { games: HistoryGame[]; onEdit: (game: HistoryGame) => void; onRemove: (gameId: number) => void }) {
   return (
     <section className="screen history-screen">
-      <div className="tabs"><button className="is-active" type="button">History</button><button type="button">Players</button></div>
+      <div className="tabs"><button className="is-active" type="button">Riwayat</button><button type="button">Pemain</button></div>
       <div className="history-list">
-        {games.map((game) => <article key={game.id} className="history-card"><header><div><h2>Game #{game.id}</h2><span>{game.dateShort}</span></div><strong className={game.winner === 'A' ? 'winner-badge' : 'winner-badge red'}>Team {game.winner} won</strong></header><div className="history-teams"><div><h3>Team A</h3><p>{game.teamA.join(', ')}</p></div><span>VS</span><div><h3>Team B</h3><p>{game.teamB.join(', ')}</p></div></div><div className="history-actions"><button type="button" onClick={() => onEdit(game)}><span className="button-content"><PencilIcon size={14} />Edit</span></button><button type="button" className="danger" onClick={() => onRemove(game.id)}><span className="button-content"><TrashIcon size={14} />Delete</span></button></div></article>)}
+        {games.map((game) => <article key={game.id} className="history-card"><header><div><h2>Game #{game.id}</h2><span>{game.dateShort}</span></div><strong className={game.winner === 'A' ? 'winner-badge' : 'winner-badge red'}>Tim {game.winner} menang</strong></header><div className="history-teams"><div><h3>Tim A</h3><p>{game.teamA.join(', ')}</p></div><span>VS</span><div><h3>Tim B</h3><p>{game.teamB.join(', ')}</p></div></div><div className="history-actions"><button type="button" onClick={() => onEdit(game)}>Edit</button><button type="button" className="danger" onClick={() => onRemove(game.id)}>Hapus</button></div></article>)}
       </div>
-      <button type="button" className="load-more">Load more games</button>
+      <button type="button" className="load-more">Muat game lainnya</button>
     </section>
   )
 }
@@ -364,16 +361,16 @@ function HistoryScreen({ games, onEdit, onRemove }: { games: HistoryGame[]; onEd
 function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId, onSearchChange, onSelectPlayer, onAddPlayer }: { players: PlayerCard[]; playerQuery: string; selectedPlayer: PlayerCard; selectedPlayerId: string; onSearchChange: (value: string) => void; onSelectPlayer: (playerId: string) => void; onAddPlayer: () => void }) {
   return (
     <section className="screen players-screen">
-      <div className="tabs"><button type="button">History</button><button className="is-active" type="button">Players</button></div>
-      <label className="search-box"><span className="search-icon"><SearchIcon size={18} /></span><input value={playerQuery} placeholder="Find or add player..." onChange={(event) => onSearchChange(event.target.value)} /></label>
-      <button type="button" className="primary-button save-button" onClick={onAddPlayer}><span className="button-content"><PlusIcon size={18} />Add Player</span></button>
-      <div className="players-layout"><section className="card player-list-card">{players.map((player, index) => <button key={player.id} type="button" className={`player-row ${selectedPlayerId === player.id ? 'is-active' : ''}`} onClick={() => onSelectPlayer(player.id)}><Avatar name={player.name} seed={index} /><div><strong>{player.name}</strong><span>{player.games} games - {player.winRate} win</span></div><em>{player.active ? 'Active' : 'New'}</em></button>)}</section><PlayerDetail player={selectedPlayer} /></div>
+      <div className="tabs"><button type="button">Riwayat</button><button className="is-active" type="button">Pemain</button></div>
+      <label className="search-box"><span>Cari</span><input value={playerQuery} placeholder="Cari atau tambah pemain..." onChange={(event) => onSearchChange(event.target.value)} /></label>
+      <button type="button" className="primary-button save-button" onClick={onAddPlayer}>+ Tambah Pemain</button>
+      <div className="players-layout"><section className="card player-list-card">{players.map((player, index) => <button key={player.id} type="button" className={`player-row ${selectedPlayerId === player.id ? 'is-active' : ''}`} onClick={() => onSelectPlayer(player.id)}><Avatar name={player.name} seed={index} /><div><strong>{player.name}</strong><span>{player.games} game - {player.winRate} menang</span></div></button>)}</section><PlayerDetail player={selectedPlayer} /></div>
     </section>
   )
 }
 
 function PlayerDetail({ player }: { player: PlayerCard }) {
-  return <section className="card player-detail-card"><header><Avatar name={player.name} /><div><h2>{player.name}</h2><p>Stats are automatic from recorded games.</p></div></header><div className="points-grid six"><div><span>Games</span><strong>{player.games}</strong></div><div><span>Wins</span><strong className="green-text">{player.wins}</strong></div><div><span>Losses</span><strong className="red-text">{player.losses}</strong></div><div><span>Points</span><strong>{player.points}</strong></div><div><span>Coef</span><strong>{player.coefficient}</strong></div><div><span>Win Rate</span><strong>{player.winRate}</strong></div></div><div className="recent-games"><h3>Recent games</h3>{player.recentGames.length === 0 && <p>No games yet.</p>}{player.recentGames.map((game) => <div key={game.label}><span>{game.label}</span><strong className={game.result.startsWith('W') ? 'green-text' : 'red-text'}>{game.result}</strong></div>)}</div></section>
+  return <section className="card player-detail-card"><header><Avatar name={player.name} /><div><h2>{player.name}</h2><p>Statistik otomatis dihitung dari game yang dicatat.</p></div></header><div className="points-grid six"><div><span>Game</span><strong>{player.games}</strong></div><div><span>Menang</span><strong className="green-text">{player.wins}</strong></div><div><span>Kalah</span><strong className="red-text">{player.losses}</strong></div><div><span>Poin</span><strong>{player.points}</strong></div><div><span>Koef</span><strong>{player.coefficient}</strong></div><div><span>Menang %</span><strong>{player.winRate}</strong></div></div><div className="recent-games"><h3>Game Terakhir</h3>{player.recentGames.length === 0 && <p>Belum ada game.</p>}{player.recentGames.map((game) => <div key={game.label}><span>{game.label}</span><strong className={game.result.startsWith('M') ? 'green-text' : 'red-text'}>{game.result}</strong></div>)}</div></section>
 }
 
 function Avatar({ name, seed = 0 }: { name: string; seed?: number }) {
