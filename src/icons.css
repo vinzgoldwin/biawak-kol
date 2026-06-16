@@ -1,0 +1,83 @@
+.app-icon {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+}
+
+.button-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
+}
+
+.select-pill,
+.primary-button,
+.secondary-button {
+  display: grid;
+  place-items: center;
+}
+
+.nav-icon {
+  display: grid;
+  place-items: center;
+  line-height: 0;
+}
+
+.bottom-nav-item .nav-icon {
+  font-size: 0;
+}
+
+.field-label,
+.search-icon,
+.save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.field-label svg,
+.search-icon svg,
+.save-status svg,
+.button-content svg,
+.nav-icon svg,
+.icon-button svg,
+.history-actions svg {
+  flex: 0 0 auto;
+}
+
+.search-box .search-icon {
+  color: #6b7280;
+  font-size: 0;
+}
+
+.save-status {
+  gap: 6px;
+}
+
+.save-status.is-error svg {
+  display: none;
+}
+
+.success-icon {
+  font-size: 0;
+}
+
+.success-icon svg {
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .08));
+}
+
+.history-actions .button-content {
+  gap: 6px;
+}
+
+@media (min-width: 860px) {
+  .nav-item .nav-icon {
+    width: 18px;
+  }
+}
