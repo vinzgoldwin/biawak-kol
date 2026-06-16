@@ -1,0 +1,64 @@
+.mobile-topbar {
+  height: 62px;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+}
+
+.mobile-topbar .icon-button[aria-label="Menu"] {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.mobile-topbar .icon-button[aria-label="Alerts"] {
+  background: #fff url('/brand/biawak-kol-square.webp') center / 38px 38px no-repeat;
+  border: 1px solid var(--line);
+  box-shadow: 0 6px 14px rgba(17, 24, 39, .08);
+  color: transparent;
+  font-size: 0;
+}
+
+.brand {
+  min-width: 0;
+  width: 100%;
+}
+
+.brand-logo {
+  width: min(218px, 100%);
+  height: 52px;
+  flex: 1 1 auto;
+  background: url('/brand/biawak-kol-horizontal.webp') center / contain no-repeat;
+}
+
+.brand-logo span,
+.brand > div:not(.brand-logo) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.success-icon {
+  width: 96px;
+  height: 96px;
+  border-radius: 26px;
+  overflow: hidden;
+  background: #fff url('/brand/biawak-kol-square.webp') center / cover no-repeat;
+  border: 1px solid var(--line);
+  box-shadow: 0 14px 30px rgba(17, 24, 39, .1);
+  color: transparent;
+  font-size: 0;
+}
+
+@media (min-width: 860px) {
+  .desktop-sidebar .brand {
+    align-items: flex-start;
+    min-height: 218px;
+  }
+
+  .desktop-sidebar .brand-logo {
+    width: 172px;
+    height: 216px;
+    background-image: url('/brand/biawak-kol-vertical.webp');
+  }
+}
