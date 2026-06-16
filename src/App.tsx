@@ -1,19 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './index.css'
 import {
   historySeed,
-  leaderboardQualified,
-  leaderboardUnqualified,
   navItems,
   playerDirectory,
-  recordPool,
-  summaryStats,
+  summaryStats as summaryStatsSeed,
   type HistoryGame,
+  type LeaderboardRow,
   type NavKey,
   type PlayerCard,
 } from './data'
 
-type Winner = 'A' | 'B'
+type Winner = HistoryGame['winner']
 
 type RecordState = {
   dateLabel: string
@@ -23,6 +21,24 @@ type RecordState = {
   teamB: string[]
   winner: Winner | null
 }
+
+type RosterPlayer = Pick<PlayerCard, 'id' | 'name'>
+
+type PersistedAppState = {
+  recordState: RecordState
+  historyGames: HistoryGame[]
+  rosterPlayers: RosterPlayer[]
+  selectedPlayerId: string
+}
+
+type DashboardStat = {
+  label: string
+  value: string
+}
+
+const STORAGE_KEY = 'biawak-kol:app-state:v1'
+const SEEDED_HISTORY_MAX_ID = Math.max(...historySeed.map((game) => game.id))
+const SEEDED_TOTAL_GAMES = Number(summaryStatsSeed.find((item) => item.label === 'Total Game')?.value ?? historySeed.length)
 
 const initialRecordState: RecordState = {
   dateLabel: '16 Juni 2026',
@@ -41,13 +57,40 @@ const navIcon: Record<NavKey, string> = {
   players: 'P',
 }
 
+const monthShortNames: Record<string, string> = {
+  Januari: 'Jan',
+  Februari: 'Feb',
+  Maret: 'Mar',
+  April: 'Apr',
+  Mei: 'Mei',
+  Juni: 'Jun',
+  Juli: 'Jul',
+  Agustus: 'Agu',
+  September: 'Sep',
+  Oktober: 'Okt',
+  November: 'Nov',
+  Desember: 'Des',
+  January: 'Jan',
+  February: 'Feb',
+  March: 'Mar',
+  May: 'May',
+  June: 'Jun',
+  July: 'Jul',
+  August: 'Aug',
+  October: 'Oct',
+  December: 'Dec',
+}
+
 function App() {
+  const [initialState] = useState(loadPersistedState)
   const [activeScreen, setActiveScreen] = useState<NavKey>('dashboard')
-  const [recordState, setRecordState] = useState<RecordState>(initialRecordState)
-  const [historyGames, setHistoryGames] = useState(historySeed)
-  const [players, setPlayers] = useState(playerDirectory)
-  const [selectedPlayerId, setSelectedPlayerId] = useState('kevin')
+  const [recordState, setRecordState] = useState<RecordState>(initialState.recordState)
+  const [historyGames, setHistoryGames] = useState<HistoryGame[]>(initialState.historyGames)
+  const [rosterPlayers, setRosterPlayers] = useState<RosterPlayer[]>(initialState.rosterPlayers)
+  const [selectedPlayerId, setSelectedPlayerId] = useState(initialState.selectedPlayerId)
   const [playerQuery, setPlayerQuery] = useState('')
+
+  const players = useMemo(() => buildPlayerCards(rosterPlayers, historyGames), [historyGames, rosterPlayers])
 
   const assignedPlayers = useMemo(
     () => new Set([...recordState.teamA, ...recordState.teamB]),
@@ -56,18 +99,35 @@ function App() {
 
   const availablePlayers = useMemo(() => {
     const query = recordState.search.trim().toLowerCase()
-    return recordPool.filter((player) => !assignedPlayers.has(player) && (query === '' || player.toLowerCase().includes(query)))
-  }, [assignedPlayers, recordState.search])
+    return players.map((player) => player.name).filter((player) => !assignedPlayers.has(player) && (query === '' || player.toLowerCase().includes(query)))
+  }, [assignedPlayers, players, recordState.search])
 
   const filteredPlayers = useMemo(() => {
     const query = playerQuery.trim().toLowerCase()
     return players.filter((player) => query === '' || player.name.toLowerCase().includes(query))
   }, [playerQuery, players])
 
-  const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? players[0]
+  const leaderboardRows = useMemo(() => buildLeaderboardRows(players), [players])
+  const leaderboardQualified = useMemo(() => leaderboardRows.filter((player) => player.games >= 5), [leaderboardRows])
+  const leaderboardUnqualified = useMemo(() => leaderboardRows.filter((player) => player.games < 5), [leaderboardRows])
+  const dashboardStats = useMemo(
+    () => buildDashboardStats(historyGames, players, leaderboardRows),
+    [historyGames, leaderboardRows, players],
+  )
+
+  const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? players[0] ?? createEmptyPlayer({ id: 'kevin', name: 'Kevin' })
   const teamsEven = recordState.teamA.length === recordState.teamB.length
   const teamsFull = recordState.teamA.length === recordState.teamSize && recordState.teamB.length === recordState.teamSize
   const canSave = teamsEven && teamsFull && recordState.winner !== null
+
+  useEffect(() => {
+    persistState({
+      recordState,
+      historyGames,
+      rosterPlayers,
+      selectedPlayerId: selectedPlayer.id,
+    })
+  }, [historyGames, recordState, rosterPlayers, selectedPlayer.id])
 
   const addPlayerToTeam = (playerName: string, team: Winner) => {
     setRecordState((current) => {
@@ -99,29 +159,19 @@ function App() {
   }
 
   const saveGame = () => {
-    if (canSave) setActiveScreen('saved')
+    if (!canSave) return
+
+    setHistoryGames((current) => [createHistoryGame(recordState, current), ...current])
+    setActiveScreen('saved')
   }
 
   const addPlayer = () => {
     const trimmed = playerQuery.trim()
     if (!trimmed) return
-    const id = trimmed.toLowerCase().replace(/\s+/g, '-')
-    if (players.some((player) => player.id === id)) return
+    if (rosterPlayers.some((player) => hasSameName(player.name, trimmed))) return
 
-    const nextPlayer: PlayerCard = {
-      id,
-      name: trimmed,
-      active: false,
-      games: 0,
-      wins: 0,
-      losses: 0,
-      points: 0,
-      coefficient: '0.00',
-      winRate: '0%',
-      recentGames: [],
-    }
-
-    setPlayers((current) => [nextPlayer, ...current])
+    const id = createUniquePlayerId(trimmed, new Set(rosterPlayers.map((player) => player.id)))
+    setRosterPlayers((current) => [{ id, name: trimmed }, ...current])
     setSelectedPlayerId(id)
     setPlayerQuery('')
   }
@@ -140,7 +190,14 @@ function App() {
           <button type="button" className="icon-button" aria-label="Notifikasi">Notif</button>
         </header>
 
-        {activeScreen === 'dashboard' && <DashboardScreen onRecordNewGame={() => setActiveScreen('record')} />}
+        {activeScreen === 'dashboard' && (
+          <DashboardScreen
+            summaryStats={dashboardStats}
+            leaderboardQualified={leaderboardQualified}
+            leaderboardUnqualified={leaderboardUnqualified}
+            onRecordNewGame={() => setActiveScreen('record')}
+          />
+        )}
         {activeScreen === 'record' && (
           <RecordScreen
             recordState={recordState}
@@ -205,7 +262,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
   )
 }
 
-function DashboardScreen({ onRecordNewGame }: { onRecordNewGame: () => void }) {
+function DashboardScreen({ summaryStats, leaderboardQualified, leaderboardUnqualified, onRecordNewGame }: { summaryStats: DashboardStat[]; leaderboardQualified: LeaderboardRow[]; leaderboardUnqualified: LeaderboardRow[]; onRecordNewGame: () => void }) {
   return (
     <section className="screen dashboard-screen">
       <div className="toolbar-card">
@@ -236,7 +293,7 @@ function DashboardScreen({ onRecordNewGame }: { onRecordNewGame: () => void }) {
   )
 }
 
-function LeaderboardTable({ rows, ranked = false }: { rows: typeof leaderboardQualified; ranked?: boolean }) {
+function LeaderboardTable({ rows, ranked = false }: { rows: LeaderboardRow[]; ranked?: boolean }) {
   return (
     <div className="leaderboard-table" role="table">
       <div className="table-head" role="row">
@@ -357,6 +414,297 @@ function PlayerDetail({ player }: { player: PlayerCard }) {
 function Avatar({ name, seed = 0 }: { name: string; seed?: number }) {
   const initials = name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
   return <span className={`avatar avatar-${seed % 5}`}>{initials}</span>
+}
+
+function loadPersistedState(): PersistedAppState {
+  const fallback = createFallbackState()
+  if (typeof window === 'undefined') return fallback
+
+  try {
+    const rawState = window.localStorage.getItem(STORAGE_KEY)
+    if (!rawState) return fallback
+
+    const parsed = JSON.parse(rawState) as Partial<PersistedAppState> & { players?: unknown }
+    const recordState = isRecordState(parsed.recordState) ? parsed.recordState : fallback.recordState
+    const historyGames = Array.isArray(parsed.historyGames) && parsed.historyGames.every(isHistoryGame) ? parsed.historyGames : fallback.historyGames
+    const rosterSource = Array.isArray(parsed.rosterPlayers) ? parsed.rosterPlayers : parsed.players
+    const rosterPlayers = normalizeRosterPlayers(rosterSource, recordState, historyGames)
+    const selectedPlayerId = typeof parsed.selectedPlayerId === 'string' && rosterPlayers.some((player) => player.id === parsed.selectedPlayerId)
+      ? parsed.selectedPlayerId
+      : rosterPlayers[0]?.id ?? fallback.selectedPlayerId
+
+    return { recordState, historyGames, rosterPlayers, selectedPlayerId }
+  } catch {
+    return fallback
+  }
+}
+
+function persistState(state: PersistedAppState) {
+  if (typeof window === 'undefined') return
+
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // Ignore quota/private-mode failures; persistence is best-effort and the app should still work.
+  }
+}
+
+function createFallbackState(): PersistedAppState {
+  return {
+    recordState: cloneRecordState(initialRecordState),
+    historyGames: historySeed.map(cloneHistoryGame),
+    rosterPlayers: playerDirectory.map(({ id, name }) => ({ id, name })),
+    selectedPlayerId: playerDirectory[0]?.id ?? 'kevin',
+  }
+}
+
+function cloneRecordState(recordState: RecordState): RecordState {
+  return {
+    ...recordState,
+    teamA: [...recordState.teamA],
+    teamB: [...recordState.teamB],
+  }
+}
+
+function cloneHistoryGame(game: HistoryGame): HistoryGame {
+  return {
+    ...game,
+    teamA: [...game.teamA],
+    teamB: [...game.teamB],
+  }
+}
+
+function normalizeRosterPlayers(source: unknown, recordState: RecordState, historyGames: HistoryGame[]): RosterPlayer[] {
+  const sourcePlayers = Array.isArray(source) && source.some(isRosterPlayer) ? source.filter(isRosterPlayer) : playerDirectory
+  const usedIds = new Set<string>()
+  const usedNames = new Set<string>()
+  const rosterPlayers: RosterPlayer[] = []
+
+  sourcePlayers.forEach((player) => {
+    const name = player.name.trim()
+    if (!name || usedNames.has(name.toLowerCase())) return
+
+    const id = createUniquePlayerId(name, usedIds, player.id)
+    usedNames.add(name.toLowerCase())
+    rosterPlayers.push({ id, name })
+  })
+
+  collectReferencedPlayerNames(recordState, historyGames).forEach((name) => {
+    if (usedNames.has(name.toLowerCase())) return
+
+    const id = createUniquePlayerId(name, usedIds)
+    usedNames.add(name.toLowerCase())
+    rosterPlayers.push({ id, name })
+  })
+
+  return rosterPlayers.length > 0 ? rosterPlayers : playerDirectory.map(({ id, name }) => ({ id, name }))
+}
+
+function collectReferencedPlayerNames(recordState: RecordState, historyGames: HistoryGame[]) {
+  return [
+    ...recordState.teamA,
+    ...recordState.teamB,
+    ...historyGames.flatMap((game) => [...game.teamA, ...game.teamB]),
+  ].map((name) => name.trim()).filter(Boolean)
+}
+
+function isRecordState(value: unknown): value is RecordState {
+  if (!value || typeof value !== 'object') return false
+
+  const candidate = value as Partial<RecordState>
+  return typeof candidate.dateLabel === 'string'
+    && typeof candidate.teamSize === 'number'
+    && [3, 4, 5].includes(candidate.teamSize)
+    && typeof candidate.search === 'string'
+    && Array.isArray(candidate.teamA)
+    && candidate.teamA.every(isString)
+    && Array.isArray(candidate.teamB)
+    && candidate.teamB.every(isString)
+    && (candidate.winner === null || isWinner(candidate.winner))
+}
+
+function isHistoryGame(value: unknown): value is HistoryGame {
+  if (!value || typeof value !== 'object') return false
+
+  const candidate = value as Partial<HistoryGame>
+  return typeof candidate.id === 'number'
+    && Number.isInteger(candidate.id)
+    && typeof candidate.dateLabel === 'string'
+    && typeof candidate.dateShort === 'string'
+    && isWinner(candidate.winner)
+    && Array.isArray(candidate.teamA)
+    && candidate.teamA.every(isString)
+    && Array.isArray(candidate.teamB)
+    && candidate.teamB.every(isString)
+}
+
+function isRosterPlayer(value: unknown): value is RosterPlayer {
+  if (!value || typeof value !== 'object') return false
+
+  const candidate = value as Partial<RosterPlayer>
+  return typeof candidate.id === 'string' && typeof candidate.name === 'string'
+}
+
+function isWinner(value: unknown): value is Winner {
+  return value === 'A' || value === 'B'
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string'
+}
+
+function buildPlayerCards(rosterPlayers: RosterPlayer[], historyGames: HistoryGame[]) {
+  const usedIds = new Set(rosterPlayers.map((player) => player.id))
+  const playersByName = new Map<string, PlayerCard>()
+
+  rosterPlayers.forEach((rosterPlayer) => {
+    playersByName.set(rosterPlayer.name.toLowerCase(), createSeededPlayerCard(rosterPlayer))
+  })
+
+  historyGames.forEach((game) => {
+    [...game.teamA, ...game.teamB].forEach((name) => {
+      const key = name.toLowerCase()
+      if (playersByName.has(key)) return
+
+      const id = createUniquePlayerId(name, usedIds)
+      playersByName.set(key, createEmptyPlayer({ id, name }))
+    })
+  })
+
+  historyGames
+    .filter((game) => game.id > SEEDED_HISTORY_MAX_ID)
+    .toSorted((first, second) => first.id - second.id)
+    .forEach((game) => {
+      const winningTeam = game.winner === 'A' ? game.teamA : game.teamB
+      const losingTeam = game.winner === 'A' ? game.teamB : game.teamA
+
+      winningTeam.forEach((name) => applyGameResult(playersByName, name, game, true, game.winner === 'A' ? 'Tim B' : 'Tim A'))
+      losingTeam.forEach((name) => applyGameResult(playersByName, name, game, false, game.winner === 'A' ? 'Tim A' : 'Tim B'))
+    })
+
+  return Array.from(playersByName.values())
+}
+
+function createSeededPlayerCard(rosterPlayer: RosterPlayer): PlayerCard {
+  const seedPlayer = playerDirectory.find((player) => player.id === rosterPlayer.id || hasSameName(player.name, rosterPlayer.name))
+  if (!seedPlayer) return createEmptyPlayer(rosterPlayer)
+
+  return {
+    ...seedPlayer,
+    id: rosterPlayer.id,
+    name: rosterPlayer.name,
+    recentGames: seedPlayer.recentGames.map((game) => ({ ...game })),
+  }
+}
+
+function createEmptyPlayer(player: RosterPlayer): PlayerCard {
+  return {
+    ...player,
+    active: false,
+    games: 0,
+    wins: 0,
+    losses: 0,
+    points: 0,
+    coefficient: '0.00',
+    winRate: '0%',
+    recentGames: [],
+  }
+}
+
+function applyGameResult(playersByName: Map<string, PlayerCard>, playerName: string, game: HistoryGame, didWin: boolean, opponentLabel: string) {
+  const key = playerName.toLowerCase()
+  const currentPlayer = playersByName.get(key)
+  if (!currentPlayer) return
+
+  const games = currentPlayer.games + 1
+  const wins = currentPlayer.wins + (didWin ? 1 : 0)
+  const losses = currentPlayer.losses + (didWin ? 0 : 1)
+  const points = currentPlayer.points + (didWin ? 3 : -1)
+
+  playersByName.set(key, {
+    ...currentPlayer,
+    active: true,
+    games,
+    wins,
+    losses,
+    points,
+    coefficient: formatCoefficient(points, games),
+    winRate: formatWinRate(wins, games),
+    recentGames: [
+      {
+        label: `${game.dateShort} vs ${opponentLabel}`,
+        result: didWin ? 'M +3' : 'K -1',
+      },
+      ...currentPlayer.recentGames,
+    ].slice(0, 3),
+  })
+}
+
+function buildLeaderboardRows(players: PlayerCard[]): LeaderboardRow[] {
+  return players
+    .map(({ name, games, wins, losses, points, coefficient, winRate }) => ({ name, games, wins, losses, points, coefficient, winRate }))
+    .toSorted((first, second) => second.points - first.points || second.wins - first.wins || second.games - first.games || first.name.localeCompare(second.name))
+}
+
+function buildDashboardStats(historyGames: HistoryGame[], players: PlayerCard[], leaderboardRows: LeaderboardRow[]): DashboardStat[] {
+  const totalGames = SEEDED_TOTAL_GAMES + historyGames.filter((game) => game.id > SEEDED_HISTORY_MAX_ID).length
+  const topPlayer = leaderboardRows[0]?.name ?? '-'
+  const bestWinRate = players.reduce((bestRate, player) => {
+    if (player.games === 0) return bestRate
+    return Math.max(bestRate, Math.round((player.wins / player.games) * 100))
+  }, 0)
+
+  return [
+    { label: 'Total Game', value: String(totalGames) },
+    { label: 'Pemain Aktif', value: String(players.filter((player) => player.active).length) },
+    { label: 'Pemain Teratas', value: topPlayer },
+    { label: 'Persen Menang Terbaik', value: `${bestWinRate}%` },
+  ]
+}
+
+function createHistoryGame(recordState: RecordState, existingGames: HistoryGame[]): HistoryGame {
+  return {
+    id: Math.max(0, ...existingGames.map((game) => game.id)) + 1,
+    dateLabel: recordState.dateLabel,
+    dateShort: createDateShort(recordState.dateLabel),
+    winner: recordState.winner ?? 'A',
+    teamA: [...recordState.teamA],
+    teamB: [...recordState.teamB],
+  }
+}
+
+function createDateShort(dateLabel: string) {
+  return dateLabel.split(' ').map((part) => monthShortNames[part] ?? part).join(' ')
+}
+
+function createUniquePlayerId(name: string, usedIds: Set<string>, preferredId?: string) {
+  const baseId = slugify(preferredId || name) || 'player'
+  let playerId = baseId
+  let suffix = 2
+
+  while (usedIds.has(playerId)) {
+    playerId = `${baseId}-${suffix}`
+    suffix += 1
+  }
+
+  usedIds.add(playerId)
+  return playerId
+}
+
+function slugify(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+function hasSameName(firstName: string, secondName: string) {
+  return firstName.trim().toLowerCase() === secondName.trim().toLowerCase()
+}
+
+function formatCoefficient(points: number, games: number) {
+  return games === 0 ? '0.00' : (points / games).toFixed(2)
+}
+
+function formatWinRate(wins: number, games: number) {
+  return games === 0 ? '0%' : `${Math.round((wins / games) * 100)}%`
 }
 
 export default App
