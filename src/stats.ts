@@ -8,6 +8,7 @@ export type SummaryStat = {
 }
 
 export type LeaderboardData = {
+  all: LeaderboardRow[]
   qualified: LeaderboardRow[]
   unqualified: LeaderboardRow[]
 }
@@ -24,17 +25,27 @@ type MutablePlayerStats = {
 }
 
 const slugifyName = (name: string) => name.trim().toLowerCase().replace(/\s+/g, '-')
-const formatCoefficient = (points: number, games: number) => (games === 0 ? '0.00' : (points / games).toFixed(2))
+const formatCoefficient = (points: number, games: number) => {
+  if (games === 0) return '0.00'
+
+  const coefficient = points / games
+  return coefficient < 0 ? `(${Math.abs(coefficient).toFixed(2)})` : coefficient.toFixed(2)
+}
 const formatWinRate = (wins: number, games: number) => (games === 0 ? '0%' : `${Math.round((wins / games) * 100)}%`)
 const getWinRateValue = (player: Pick<PlayerCard, 'games' | 'wins'>) => (player.games === 0 ? 0 : player.wins / player.games)
+const getCoefficientValue = (coefficient: string) => (
+  coefficient.startsWith('(') && coefficient.endsWith(')')
+    ? -Number(coefficient.slice(1, -1))
+    : Number(coefficient)
+)
 
 const createEmptyStats = (player: RosterPlayer, sourceIndex: number): MutablePlayerStats => ({
   id: player.id,
   name: player.name,
-  games: 0,
-  wins: 0,
-  losses: 0,
-  points: 0,
+  games: player.seedStats?.games ?? 0,
+  wins: player.seedStats?.wins ?? 0,
+  losses: player.seedStats?.losses ?? 0,
+  points: player.seedStats?.points ?? 0,
   recentGames: [],
   sourceIndex,
 })
@@ -73,7 +84,7 @@ const toLeaderboardRow = (player: PlayerCard): LeaderboardRow => ({
 
 const compareLeaderboardPlayers = (left: PlayerCard, right: PlayerCard) => (
   right.points - left.points
-  || Number(right.coefficient) - Number(left.coefficient)
+  || getCoefficientValue(right.coefficient) - getCoefficientValue(left.coefficient)
   || getWinRateValue(right) - getWinRateValue(left)
   || right.wins - left.wins
   || left.name.localeCompare(right.name)
@@ -117,7 +128,7 @@ export function buildPlayerStats(rosterPlayers: RosterPlayer[], games: HistoryGa
         if (player.recentGames.length < 3) {
           player.recentGames.push({
             label: `${game.dateShort} vs ${team.opponent}`,
-            result: didWin ? 'M +3' : 'K -1',
+            result: didWin ? '+3' : '-1',
           })
         }
       })
@@ -135,6 +146,7 @@ export function buildLeaderboard(players: PlayerCard[]): LeaderboardData {
     .sort(compareLeaderboardPlayers)
 
   return {
+    all: rankedPlayers.map(toLeaderboardRow),
     qualified: rankedPlayers
       .filter((player) => player.games >= MINIMUM_QUALIFIED_GAMES)
       .map(toLeaderboardRow),
@@ -153,8 +165,8 @@ export function buildDashboardSummary(games: HistoryGame[], players: PlayerCard[
 
   return [
     { label: 'Total Game', value: String(games.length) },
-    { label: 'Pemain Aktif', value: String(activePlayers.length) },
+    { label: 'Pemain', value: String(activePlayers.length) },
     { label: 'Pemain Teratas', value: topPlayer?.name ?? '-' },
-    { label: 'Persen Menang Terbaik', value: bestWinRatePlayer?.winRate ?? '-' },
+    { label: 'Persen Menang Terbaik (≥5 Game)', value: bestWinRatePlayer?.winRate ?? '-' },
   ]
 }
