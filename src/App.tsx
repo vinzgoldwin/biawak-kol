@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { cn } from '@/lib/utils'
 import { Avatar as ShadAvatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -29,6 +30,7 @@ import {
   SearchIcon,
   TrashIcon,
   UsersIcon,
+  XIcon,
   type IconComponent,
 } from './icons'
 import { buildDashboardSummary, buildLeaderboard, buildPlayerStats, type SummaryStat } from './stats'
@@ -38,6 +40,8 @@ type Winner = 'A' | 'B'
 const TEAM_SIZE = 5
 const HISTORY_STORAGE_KEY = 'biawak-kol.historyGames'
 const ROSTER_STORAGE_KEY = 'biawak-kol.rosterPlayers'
+const PROTECTED_PASSWORD_STORAGE_KEY = 'biawak-kol.protectedPassword'
+const PROTECTED_PASSWORD = 'bangmomotmvp'
 
 type RecordState = {
   dateValue: string
@@ -56,6 +60,12 @@ type UndoToast = {
   | { type: 'restore-deleted'; game: HistoryGame; restoreIndex: number }
   | { type: 'restore-updated'; game: HistoryGame }
 )
+
+type PendingProtectedAction = {
+  id: number
+  title: string
+  onAllowed: () => void
+}
 
 const navIcon: Record<NavKey, IconComponent> = {
   dashboard: HomeIcon,
@@ -243,6 +253,24 @@ function writeStoredArray<T>(key: string, value: T[]) {
   }
 }
 
+function hasStoredProtectedAccess() {
+  if (typeof window === 'undefined') return false
+
+  try {
+    return window.localStorage.getItem(PROTECTED_PASSWORD_STORAGE_KEY) === PROTECTED_PASSWORD
+  } catch {
+    return false
+  }
+}
+
+function storeProtectedAccess(password: string) {
+  try {
+    window.localStorage.setItem(PROTECTED_PASSWORD_STORAGE_KEY, password)
+  } catch {
+    // Losing persistence only means the user may need to unlock again later.
+  }
+}
+
 function App() {
   const [activeScreen, setActiveScreen] = useState<NavKey>('dashboard')
   const [recordState, setRecordState] = useState<RecordState>(createEmptyRecordState)
@@ -253,6 +281,7 @@ function App() {
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue)
   const [undoToast, setUndoToast] = useState<UndoToast | null>(null)
   const [editingGameId, setEditingGameId] = useState<number | null>(null)
+  const [pendingProtectedAction, setPendingProtectedAction] = useState<PendingProtectedAction | null>(null)
 
   useEffect(() => {
     writeStoredArray(HISTORY_STORAGE_KEY, historyGames)
@@ -319,6 +348,29 @@ function App() {
   const teamsFull = recordState.teamA.length === TEAM_SIZE && recordState.teamB.length === TEAM_SIZE
   const canSave = teamsEven && teamsFull && recordState.winner !== null
 
+  const runProtectedAction = (title: string, onAllowed: () => void) => {
+    if (hasStoredProtectedAccess()) {
+      onAllowed()
+      return
+    }
+
+    setPendingProtectedAction({
+      id: Date.now(),
+      title,
+      onAllowed,
+    })
+  }
+
+  const unlockProtectedAction = (password: string) => {
+    if (password !== PROTECTED_PASSWORD || pendingProtectedAction === null) return false
+
+    storeProtectedAccess(password)
+    const action = pendingProtectedAction.onAllowed
+    setPendingProtectedAction(null)
+    action()
+    return true
+  }
+
   const openBlankRecorder = () => {
     setRecordState(createEmptyRecordState())
     setEditingGameId(null)
@@ -327,7 +379,7 @@ function App() {
 
   const navigateToScreen = (screen: NavKey) => {
     if (screen === 'record') {
-      openBlankRecorder()
+      runProtectedAction('Buka Catat Game', openBlankRecorder)
       return
     }
 
@@ -352,15 +404,17 @@ function App() {
   }
 
   const loadGameIntoRecorder = (game: HistoryGame) => {
-    setRecordState({
-      dateValue: toDateValue(game.dateLabel),
-      search: '',
-      teamA: [...game.teamA],
-      teamB: [...game.teamB],
-      winner: game.winner,
+    runProtectedAction(`Edit Game #${game.id}`, () => {
+      setRecordState({
+        dateValue: toDateValue(game.dateLabel),
+        search: '',
+        teamA: [...game.teamA],
+        teamB: [...game.teamB],
+        winner: game.winner,
+      })
+      setEditingGameId(game.id)
+      setActiveScreen('record')
     })
-    setEditingGameId(game.id)
-    setActiveScreen('record')
   }
 
   const saveGame = () => {
@@ -396,18 +450,20 @@ function App() {
   }
 
   const removeGame = (gameId: number) => {
-    const restoreIndex = historyGames.findIndex((game) => game.id === gameId)
-    const gameToRemove = historyGames[restoreIndex]
-    if (!gameToRemove) return
+    runProtectedAction(`Hapus Game #${gameId}`, () => {
+      const restoreIndex = historyGames.findIndex((game) => game.id === gameId)
+      const gameToRemove = historyGames[restoreIndex]
+      if (!gameToRemove) return
 
-    setHistoryGames((current) => current.filter((game) => game.id !== gameId))
-    setUndoToast({
-      id: Date.now(),
-      type: 'restore-deleted',
-      message: `Game #${gameToRemove.id} dihapus`,
-      actionLabel: 'Undo',
-      game: gameToRemove,
-      restoreIndex,
+      setHistoryGames((current) => current.filter((game) => game.id !== gameId))
+      setUndoToast({
+        id: Date.now(),
+        type: 'restore-deleted',
+        message: `Game #${gameToRemove.id} dihapus`,
+        actionLabel: 'Undo',
+        game: gameToRemove,
+        restoreIndex,
+      })
     })
   }
 
@@ -446,6 +502,10 @@ function App() {
     setPlayerQuery('')
   }
 
+  const runAddPlayer = () => {
+    runProtectedAction('Tambah Pemain', addPlayer)
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground md:grid md:grid-cols-[15rem_1fr]">
       <aside className="desktop-sidebar sticky top-0 hidden h-screen border-r bg-card px-5 py-6 md:flex md:flex-col md:gap-8">
@@ -465,7 +525,7 @@ function App() {
             monthOptions={monthOptions}
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
-            onRecordNewGame={openBlankRecorder}
+            onRecordNewGame={() => runProtectedAction('Buka Catat Game', openBlankRecorder)}
           />
         )}
         {activeScreen === 'record' && (
@@ -484,7 +544,7 @@ function App() {
           />
         )}
         {activeScreen === 'saved' && (
-          <SavedScreen recordState={recordState} onRecordAgain={openBlankRecorder} onViewLeaderboard={() => setActiveScreen('dashboard')} />
+          <SavedScreen recordState={recordState} onRecordAgain={() => runProtectedAction('Buka Catat Game', openBlankRecorder)} onViewLeaderboard={() => setActiveScreen('dashboard')} />
         )}
         {activeScreen === 'history' && (
           <HistoryScreen
@@ -493,7 +553,7 @@ function App() {
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
             onEdit={loadGameIntoRecorder}
-            onRecordMore={openBlankRecorder}
+            onRecordMore={() => runProtectedAction('Buka Catat Game', openBlankRecorder)}
             onRemove={removeGame}
           />
         )}
@@ -505,7 +565,7 @@ function App() {
             selectedPlayerId={selectedPlayer.id}
             onSearchChange={setPlayerQuery}
             onSelectPlayer={setSelectedPlayerId}
-            onAddPlayer={addPlayer}
+            onAddPlayer={runAddPlayer}
           />
         )}
       </main>
@@ -518,8 +578,63 @@ function App() {
           onDismiss={() => setUndoToast(null)}
         />
       )}
+      {pendingProtectedAction && (
+        <PasswordGateDialog
+          key={pendingProtectedAction.id}
+          title={pendingProtectedAction.title}
+          onUnlock={unlockProtectedAction}
+          onCancel={() => setPendingProtectedAction(null)}
+        />
+      )}
 
       <Nav activeScreen={activeScreen} onNavigate={navigateToScreen} variant="bottom" />
+    </div>
+  )
+}
+
+function PasswordGateDialog({ title, onUnlock, onCancel }: {
+  title: string
+  onUnlock: (password: string) => boolean
+  onCancel: () => void
+}) {
+  const [password, setPassword] = useState('')
+  const [hasError, setHasError] = useState(false)
+
+  const submitPassword = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (onUnlock(password)) return
+
+    setHasError(true)
+    setPassword('')
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 grid place-items-center bg-background/70 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="password-gate-title">
+      <form className="grid w-full max-w-sm gap-4 rounded-3xl border bg-card p-5 shadow-xl" onSubmit={submitPassword}>
+        <div className="grid gap-1">
+          <h2 id="password-gate-title" className="font-heading text-lg font-semibold">{title}</h2>
+          <p className="text-sm text-muted-foreground">Masukkan password satu kali. Akses akan tersimpan di perangkat ini.</p>
+        </div>
+        <div className="grid gap-2">
+          <Input
+            autoFocus
+            type="password"
+            value={password}
+            placeholder="Password"
+            aria-invalid={hasError}
+            onChange={(event) => {
+              setPassword(event.target.value)
+              setHasError(false)
+            }}
+          />
+          {hasError && <p className="text-sm font-medium text-destructive">Password salah.</p>}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Button type="button" variant="outline" onClick={onCancel}>Batal</Button>
+          <Button type="submit">Buka</Button>
+        </div>
+      </form>
     </div>
   )
 }
@@ -551,7 +666,7 @@ function Nav({ activeScreen, onNavigate, variant }: { activeScreen: NavKey; onNa
           const Icon = navIcon[item.id]
 
           return (
-            <Button key={item.id} type="button" variant="ghost" className="h-14 flex-col gap-1 rounded-3xl px-1 text-[10px]" data-active={activeScreen === item.id} onClick={() => onNavigate(item.id)}>
+            <Button key={item.id} type="button" variant={activeScreen === item.id ? 'default' : 'ghost'} className="h-14 flex-col gap-1 rounded-3xl px-1 text-[10px]" data-active={activeScreen === item.id} onClick={() => onNavigate(item.id)}>
               <Icon data-icon="inline-start" />
               {item.label}
             </Button>
@@ -962,6 +1077,13 @@ function HistoryTeam({ title, tone, players }: { title: string; tone: 'blue' | '
 }
 
 function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId, onSearchChange, onSelectPlayer, onAddPlayer }: { players: PlayerCard[]; playerQuery: string; selectedPlayer: PlayerCard; selectedPlayerId: string; onSearchChange: (value: string) => void; onSelectPlayer: (playerId: string) => void; onAddPlayer: () => void }) {
+  const [isSheetOpen, setIsSheetOpen] = useState(false)
+
+  const handleSelectPlayer = (playerId: string) => {
+    onSelectPlayer(playerId)
+    setIsSheetOpen(true)
+  }
+
   return (
     <section className="grid gap-4 md:max-w-3xl">
       <div className="relative">
@@ -976,7 +1098,7 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
         <Card size="sm" className="rounded-3xl shadow-sm">
           <CardContent className="grid gap-2">
             {players.map((player, index) => (
-              <Button key={player.id} type="button" variant={selectedPlayerId === player.id ? 'default' : 'ghost'} className="h-auto min-h-12 justify-start rounded-2xl px-2 py-2 text-left" onClick={() => onSelectPlayer(player.id)}>
+              <Button key={player.id} type="button" variant={selectedPlayerId === player.id ? 'default' : 'ghost'} className="h-auto min-h-12 justify-start rounded-2xl px-2 py-2 text-left" onClick={() => handleSelectPlayer(player.id)}>
                 <PlayerAvatar name={player.name} seed={index} />
                 <span className="grid">
                   <strong className="text-sm font-medium">{player.name}</strong>
@@ -986,8 +1108,11 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
             ))}
           </CardContent>
         </Card>
-        <PlayerDetail player={selectedPlayer} />
+        <div className="hidden md:block">
+          <PlayerDetail player={selectedPlayer} />
+        </div>
       </div>
+      <PlayerDetailSheet open={isSheetOpen} player={selectedPlayer} onClose={() => setIsSheetOpen(false)} />
     </section>
   )
 }
@@ -1022,6 +1147,45 @@ function PlayerDetail({ player }: { player: PlayerCard }) {
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function PlayerDetailSheet({ open, player, onClose }: { open: boolean; player: PlayerCard; onClose: () => void }) {
+  useEffect(() => {
+    if (!open) return undefined
+
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [open])
+
+  return (
+    <div className={cn('fixed inset-0 z-50 md:hidden', open ? 'pointer-events-auto' : 'pointer-events-none')} aria-hidden={!open}>
+      <div
+        className={cn('absolute inset-0 bg-background/70 backdrop-blur-sm transition-opacity duration-300', open ? 'opacity-100' : 'opacity-0')}
+        onClick={onClose}
+      />
+      <div
+        className={cn(
+          'absolute bottom-0 left-0 right-0 flex max-h-[85dvh] flex-col rounded-t-3xl border bg-card shadow-xl transition-transform duration-300 ease-out',
+          open ? 'translate-y-0' : 'translate-y-full'
+        )}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="player-sheet-title"
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-center border-b bg-card px-4 py-3">
+          <div className="h-1.5 w-12 rounded-full bg-muted" />
+          <Button type="button" variant="ghost" size="icon-sm" className="absolute right-2 top-1/2 -translate-y-1/2" aria-label="Tutup detail" onClick={onClose}>
+            <XIcon size={20} />
+          </Button>
+        </div>
+        <div className="overflow-y-auto p-4">
+          <PlayerDetail player={player} />
+        </div>
+      </div>
+    </div>
   )
 }
 

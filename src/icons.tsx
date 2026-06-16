@@ -85,3 +85,7 @@ export function PencilIcon(props: IconProps) {
 export function TrashIcon(props: IconProps) {
   return <IconBase {...props}><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v5" /><path d="M14 11v5" /></IconBase>
 }
+
+export function XIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></IconBase>
+}
