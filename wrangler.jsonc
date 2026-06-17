@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "biawak-kol",
+  "name": "biawakkol",
   "compatibility_date": "2026-06-16",
   "pages_build_output_dir": "./dist",
   "kv_namespaces": [

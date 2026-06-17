@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
+import { toast } from 'sonner'
+import { Toaster } from '@/components/ui/sonner'
 import { toBlob } from 'html-to-image'
 import { cn } from '@/lib/utils'
 import { Avatar as ShadAvatar, AvatarFallback } from '@/components/ui/avatar'
@@ -291,7 +293,7 @@ function App() {
   const [undoToast, setUndoToast] = useState<UndoToast | null>(null)
   const [editingGameId, setEditingGameId] = useState<number | null>(null)
   const [pendingProtectedAction, setPendingProtectedAction] = useState<PendingProtectedAction | null>(null)
-  const [imageCopyStatus, setImageCopyStatus] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle')
+  const [isCopyingImage, setIsCopyingImage] = useState(false)
   const [remoteVersion, setRemoteVersion] = useState(0)
   const [isSyncing, setIsSyncing] = useState(false)
   const imageExportRef = useRef<HTMLDivElement>(null)
@@ -303,23 +305,35 @@ function App() {
   }, [])
 
   const handleSharedStateError = useCallback((error: unknown) => {
-    if (!(error instanceof SharedStateError)) return
+    if (error instanceof SharedStateError) {
+      if (error.code === 'unauthorized') {
+        clearProtectedAccess()
+        toast.error('Password salah. Coba masukkan lagi.', { duration: 5000 })
+        return
+      }
 
-    if (error.code === 'unauthorized') {
-      clearProtectedAccess()
+      if (error.code === 'conflict') {
+        if (error.latestState) applySharedState(error.latestState)
+        toast.error('Data berubah di perangkat lain. Saya sudah memuat versi terbaru.', { duration: 5000 })
+        return
+      }
+
+      toast.error('Data bersama belum bisa disinkronkan. Coba lagi nanti.', { duration: 5000 })
       return
     }
 
-    if (error.code === 'conflict' && error.latestState) {
-      applySharedState(error.latestState)
-    }
+    toast.error('Terjadi masalah saat sinkronisasi.', { duration: 5000 })
   }, [applySharedState])
 
   const persistSharedState = useCallback(async (nextHistoryGames: HistoryGame[], nextRosterPlayers: RosterPlayer[]) => {
     const password = getStoredProtectedPassword()
-    if (!password) return null
+    if (!password) {
+      toast.error('Masukkan password sebelum menyimpan perubahan.', { duration: 5000 })
+      return null
+    }
 
     setIsSyncing(true)
+    const toastId = toast.loading('Menyimpan...')
     try {
       const sharedState = await saveSharedState({
         password,
@@ -328,8 +342,10 @@ function App() {
         rosterPlayers: nextRosterPlayers,
       })
       applySharedState(sharedState)
+      toast.success('Data bersama tersimpan.', { id: toastId, duration: 3000 })
       return sharedState
     } catch (error) {
+      toast.dismiss(toastId)
       handleSharedStateError(error)
       return null
     } finally {
@@ -596,17 +612,42 @@ function App() {
     runProtectedAction('Tambah Pemain', addPlayer)
   }
 
-  useEffect(() => {
-    if (imageCopyStatus !== 'copied' && imageCopyStatus !== 'error') return undefined
+  const renamePlayer = async (playerId: string, nextName: string) => {
+    const trimmed = nextName.trim()
+    if (!trimmed || isSyncing) return false
 
-    const timeoutId = window.setTimeout(() => setImageCopyStatus('idle'), 2200)
-    return () => window.clearTimeout(timeoutId)
-  }, [imageCopyStatus])
+    const currentPlayer = rosterPlayers.find((player) => player.id === playerId)
+    if (!currentPlayer) return false
 
+    const currentName = currentPlayer.name
+    if (currentName === trimmed) return true
+
+    const duplicatePlayer = rosterPlayers.some((player) => (
+      player.id !== playerId && player.name.toLowerCase() === trimmed.toLowerCase()
+    ))
+    if (duplicatePlayer) {
+      toast.error('Nama pemain sudah ada.', { duration: 4000 })
+      return false
+    }
+
+    const renameTeamPlayer = (name: string) => (name === currentName ? trimmed : name)
+    const nextRosterPlayers = rosterPlayers.map((player) => (
+      player.id === playerId ? { ...player, name: trimmed } : player
+    ))
+    const nextHistoryGames = historyGames.map((game) => ({
+      ...game,
+      teamA: game.teamA.map(renameTeamPlayer),
+      teamB: game.teamB.map(renameTeamPlayer),
+    }))
+
+    return (await persistSharedState(nextHistoryGames, nextRosterPlayers)) !== null
+  }
+
+  const runRenamePlayer = (playerId: string, nextName: string) => renamePlayer(playerId, nextName)
   const copyLeaderboardImage = async () => {
-    if (!imageExportRef.current || imageCopyStatus === 'copying') return
+    if (!imageExportRef.current || isCopyingImage) return
 
-    setImageCopyStatus('copying')
+    setIsCopyingImage(true)
     try {
       const blob = await toBlob(imageExportRef.current, { pixelRatio: 2, cacheBust: true })
       if (!blob) throw new Error('Failed to generate leaderboard image')
@@ -616,9 +657,11 @@ function App() {
       }
 
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
-      setImageCopyStatus('copied')
+      toast.success('Gambar klasemen tersalin.', { duration: 3000 })
     } catch {
-      setImageCopyStatus('error')
+      toast.error('Browser ini belum mengizinkan copy gambar. Coba dari Chrome atau Edge.', { duration: 5000 })
+    } finally {
+      setIsCopyingImage(false)
     }
   }
 
@@ -643,7 +686,7 @@ function App() {
             onMonthChange={setSelectedMonth}
             onRecordNewGame={() => runProtectedAction('Buka Catat Game', openBlankRecorder)}
             onCopyImage={copyLeaderboardImage}
-            imageCopyStatus={imageCopyStatus}
+            isCopyingImage={isCopyingImage}
           />
         )}
         {activeScreen === 'record' && (
@@ -684,6 +727,8 @@ function App() {
             onSearchChange={setPlayerQuery}
             onSelectPlayer={setSelectedPlayerId}
             onAddPlayer={runAddPlayer}
+            onRenamePlayer={runRenamePlayer}
+            onProtectedAction={runProtectedAction}
           />
         )}
       </main>
@@ -707,6 +752,7 @@ function App() {
       <LeaderboardImageExport exportRef={imageExportRef} players={dashboardPlayers} selectedMonth={selectedMonth} />
 
       <Nav activeScreen={activeScreen} onNavigate={navigateToScreen} variant="bottom" />
+      <Toaster position="top-center" />
     </div>
   )
 }
@@ -823,7 +869,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
   )
 }
 
-function DashboardScreen({ summaryStats, leaderboardRows, monthOptions, selectedMonth, onMonthChange, onRecordNewGame, onCopyImage, imageCopyStatus }: {
+function DashboardScreen({ summaryStats, leaderboardRows, monthOptions, selectedMonth, onMonthChange, onRecordNewGame, onCopyImage, isCopyingImage }: {
   summaryStats: SummaryStat[]
   leaderboardRows: LeaderboardRow[]
   monthOptions: MonthOption[]
@@ -831,7 +877,7 @@ function DashboardScreen({ summaryStats, leaderboardRows, monthOptions, selected
   onMonthChange: (month: string) => void
   onRecordNewGame: () => void
   onCopyImage: () => void
-  imageCopyStatus: 'idle' | 'copying' | 'copied' | 'error'
+  isCopyingImage: boolean
 }) {
   return (
     <section className="grid gap-4 md:max-w-3xl">
@@ -858,21 +904,14 @@ function DashboardScreen({ summaryStats, leaderboardRows, monthOptions, selected
             variant="outline"
             size="icon"
             className="h-11 w-11 shrink-0"
-            aria-label={imageCopyStatus === 'copying' ? 'Menyalin gambar klasemen' : 'Copy gambar klasemen'}
-            disabled={imageCopyStatus === 'copying'}
+            aria-label={isCopyingImage ? 'Menyalin gambar klasemen' : 'Copy gambar klasemen'}
+            disabled={isCopyingImage}
             onClick={onCopyImage}
           >
             <ImageIcon size={20} />
           </Button>
         </div>
       </div>
-      {imageCopyStatus !== 'idle' && (
-        <p className={cn('px-1 text-xs font-medium', imageCopyStatus === 'error' ? 'text-destructive' : 'text-primary')} role="status" aria-live="polite">
-          {imageCopyStatus === 'copying' && 'Menyalin gambar klasemen...'}
-          {imageCopyStatus === 'copied' && 'Gambar klasemen tersalin.'}
-          {imageCopyStatus === 'error' && 'Browser ini belum mengizinkan copy gambar. Coba dari Chrome atau Edge.'}
-        </p>
-      )}
 
       <section className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-2">
         {summaryStats.map((item) => (
@@ -1327,7 +1366,17 @@ function HistoryTeam({ title, tone, players }: { title: string; tone: 'blue' | '
   )
 }
 
-function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId, onSearchChange, onSelectPlayer, onAddPlayer }: { players: PlayerCard[]; playerQuery: string; selectedPlayer: PlayerCard; selectedPlayerId: string; onSearchChange: (value: string) => void; onSelectPlayer: (playerId: string) => void; onAddPlayer: () => void }) {
+function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId, onSearchChange, onSelectPlayer, onAddPlayer, onRenamePlayer, onProtectedAction }: {
+  players: PlayerCard[]
+  playerQuery: string
+  selectedPlayer: PlayerCard
+  selectedPlayerId: string
+  onSearchChange: (value: string) => void
+  onSelectPlayer: (playerId: string) => void
+  onAddPlayer: () => void
+  onRenamePlayer: (playerId: string, nextName: string) => Promise<boolean>
+  onProtectedAction: (title: string, onAllowed: () => void | Promise<void>) => void
+}) {
   const [isSheetOpen, setIsSheetOpen] = useState(false)
 
   const handleSelectPlayer = (playerId: string) => {
@@ -1346,8 +1395,8 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
         Tambah Pemain
       </Button>
       <div className="grid gap-3 md:grid-cols-2 md:items-start">
-        <Card size="sm" className="rounded-3xl shadow-sm">
-          <CardContent className="grid gap-2">
+        <Card size="sm" className="rounded-3xl shadow-sm md:max-h-[calc(100dvh-13rem)] md:overflow-y-auto">
+          <CardContent className="grid gap-2 md:pr-2">
             {players.map((player, index) => (
               <Button key={player.id} type="button" variant={selectedPlayerId === player.id ? 'default' : 'ghost'} className="h-auto min-h-12 justify-start rounded-2xl px-2 py-2 text-left" onClick={() => handleSelectPlayer(player.id)}>
                 <PlayerAvatar name={player.name} seed={index} />
@@ -1360,21 +1409,88 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
           </CardContent>
         </Card>
         <div className="hidden md:block">
-          <PlayerDetail player={selectedPlayer} />
+          <PlayerDetail key={selectedPlayer.id} player={selectedPlayer} onRenamePlayer={onRenamePlayer} onProtectedAction={onProtectedAction} />
         </div>
       </div>
-      <PlayerDetailSheet open={isSheetOpen} player={selectedPlayer} onClose={() => setIsSheetOpen(false)} />
+      <PlayerDetailSheet open={isSheetOpen} player={selectedPlayer} onClose={() => setIsSheetOpen(false)} onRenamePlayer={onRenamePlayer} onProtectedAction={onProtectedAction} />
     </section>
   )
 }
 
-function PlayerDetail({ player }: { player: PlayerCard }) {
+function PlayerDetail({ player, onRenamePlayer, onProtectedAction }: {
+  player: PlayerCard
+  onRenamePlayer: (playerId: string, nextName: string) => Promise<boolean>
+  onProtectedAction: (title: string, onAllowed: () => void | Promise<void>) => void
+}) {
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [draftName, setDraftName] = useState(player.name)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!isEditingName) return
+
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    })
+  }, [isEditingName])
+
+  const startEditingName = () => {
+    onProtectedAction('Edit Nama Pemain', () => {
+      setDraftName(player.name)
+      setIsEditingName(true)
+    })
+  }
+
+  const saveName = async () => {
+    const saved = await onRenamePlayer(player.id, draftName)
+    if (saved) setIsEditingName(false)
+  }
+
+  const cancelEditingName = () => {
+    setDraftName(player.name)
+    setIsEditingName(false)
+  }
+
   return (
     <Card size="sm" className="rounded-3xl shadow-sm">
       <CardHeader>
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <PlayerAvatar name={player.name} />
-          <CardTitle>{player.name}</CardTitle>
+          {isEditingName ? (
+            <form
+              className="flex min-w-0 flex-1 items-center gap-2"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void saveName()
+              }}
+            >
+              <Input
+                ref={inputRef}
+                className="h-9 flex-1 rounded-2xl px-3 font-heading text-lg font-semibold"
+                value={draftName}
+                aria-label="Nama pemain"
+                onFocus={(event) => event.target.select()}
+                onChange={(event) => setDraftName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') cancelEditingName()
+                }}
+              />
+              <Button type="submit" size="icon-sm" aria-label="Simpan nama pemain">
+                <CheckIcon />
+              </Button>
+              <Button type="button" variant="outline" size="icon-sm" aria-label="Batal edit nama pemain" onClick={cancelEditingName}>
+                x
+              </Button>
+            </form>
+          ) : (
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <CardTitle className="min-w-0 truncate">{player.name}</CardTitle>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label={`Edit nama ${player.name}`} onClick={startEditingName}>
+                <PencilIcon />
+              </Button>
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -1401,13 +1517,23 @@ function PlayerDetail({ player }: { player: PlayerCard }) {
   )
 }
 
-function PlayerDetailSheet({ open, player, onClose }: { open: boolean; player: PlayerCard; onClose: () => void }) {
+function PlayerDetailSheet({ open, player, onClose, onRenamePlayer, onProtectedAction }: {
+  open: boolean
+  player: PlayerCard
+  onClose: () => void
+  onRenamePlayer: (playerId: string, nextName: string) => Promise<boolean>
+  onProtectedAction: (title: string, onAllowed: () => void | Promise<void>) => void
+}) {
   useEffect(() => {
     if (!open) return undefined
 
+    const mobileQuery = window.matchMedia('(max-width: 767px)')
+    if (!mobileQuery.matches) return undefined
+
+    const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
-      document.body.style.overflow = ''
+      document.body.style.overflow = previousOverflow
     }
   }, [open])
 
@@ -1435,7 +1561,7 @@ function PlayerDetailSheet({ open, player, onClose }: { open: boolean; player: P
           <div className="h-1.5 w-12 rounded-full bg-muted" />
         </button>
         <div className="overflow-y-auto p-4">
-          <PlayerDetail player={player} />
+          <PlayerDetail key={player.id} player={player} onRenamePlayer={onRenamePlayer} onProtectedAction={onProtectedAction} />
         </div>
       </div>
     </div>
