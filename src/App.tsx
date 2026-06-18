@@ -540,7 +540,7 @@ function App() {
 
   const navigateToScreen = (screen: NavKey) => {
     if (screen === 'record') {
-      runProtectedAction('Buka Catat Game', openBlankRecorder)
+      openBlankRecorder()
       return
     }
 
@@ -574,17 +574,15 @@ function App() {
   }
 
   const loadGameIntoRecorder = (game: HistoryGame) => {
-    runProtectedAction(`Edit Game #${game.id}`, () => {
-      setRecordState({
-        dateValue: toDateValue(game.dateLabel),
-        search: '',
-        teamA: [...game.teamA],
-        teamB: [...game.teamB],
-        winner: game.winner,
-      })
-      setEditingGameId(game.id)
-      setActiveScreen('record')
+    setRecordState({
+      dateValue: toDateValue(game.dateLabel),
+      search: '',
+      teamA: [...game.teamA],
+      teamB: [...game.teamB],
+      winner: game.winner,
     })
+    setEditingGameId(game.id)
+    setActiveScreen('record')
   }
 
   const saveGame = async () => {
@@ -782,7 +780,7 @@ function App() {
               monthOptions={monthOptions}
               selectedMonth={selectedMonth}
               onMonthChange={setSelectedMonth}
-              onRecordNewGame={() => runProtectedAction('Buka Catat Game', openBlankRecorder)}
+              onRecordNewGame={openBlankRecorder}
               onCopyImage={copyLeaderboardImage}
               isCopyingImage={isCopyingImage}
             />
@@ -801,11 +799,11 @@ function App() {
               onRemovePlayer={removePlayerFromTeam}
               onSwapTeams={swapTeams}
               onWinnerChange={(winner) => setRecordState((current) => ({ ...current, winner }))}
-              onSave={saveGame}
+              onSave={() => runProtectedAction(editingGameId === null ? 'Simpan Game' : 'Simpan Perubahan', saveGame)}
             />
           )}
           {activeScreen === 'saved' && (
-            <SavedScreen recordState={recordState} onRecordAgain={() => runProtectedAction('Buka Catat Game', openBlankRecorder)} onViewLeaderboard={() => setActiveScreen('dashboard')} />
+            <SavedScreen recordState={recordState} onRecordAgain={openBlankRecorder} onViewLeaderboard={() => setActiveScreen('dashboard')} />
           )}
           {activeScreen === 'history' && (
             <HistoryScreen
@@ -814,7 +812,7 @@ function App() {
               selectedMonth={selectedMonth}
               onMonthChange={setSelectedMonth}
               onEdit={loadGameIntoRecorder}
-              onRecordMore={() => runProtectedAction('Buka Catat Game', openBlankRecorder)}
+              onRecordMore={openBlankRecorder}
               onRemove={removeGame}
             />
           )}
@@ -1510,8 +1508,8 @@ function HistoryScreen({ games, monthOptions, selectedMonth, onMonthChange, onEd
               <p className="text-xs font-medium text-muted-foreground">{game.dateShort}</p>
             </div>
 
-            <div className="relative grid gap-4 px-4 py-4 pr-12 md:px-6 md:py-5 md:pr-14">
-              <CardAction className="absolute right-3 top-3 md:right-4 md:top-4">
+            <div className="relative grid gap-4 px-4 py-4 pr-12 md:static md:px-6 md:py-5 md:pr-14">
+              <CardAction className="absolute right-2 top-2">
                 <Menu.Root>
                   <Menu.Trigger
                     className="inline-flex size-8 items-center justify-center outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-ring/30"
