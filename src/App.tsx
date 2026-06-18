@@ -326,7 +326,7 @@ function App() {
   const [recordState, setRecordState] = useState<RecordState>(createEmptyRecordState)
   const [historyGames, setHistoryGames] = useState<HistoryGame[]>(() => readStoredArray(HISTORY_STORAGE_KEY, historySeed, isHistoryGame))
   const [rosterPlayers, setRosterPlayers] = useState<RosterPlayer[]>(() => readStoredArray(ROSTER_STORAGE_KEY, playerDirectory, isRosterPlayer))
-  const [selectedPlayerId, setSelectedPlayerId] = useState('kevin')
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
   const [playerQuery, setPlayerQuery] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue)
   const [undoToast, setUndoToast] = useState<UndoToast | null>(null)
@@ -501,7 +501,7 @@ function App() {
     return computedPlayers.filter((player) => query === '' || player.name.toLowerCase().includes(query))
   }, [computedPlayers, playerQuery])
 
-  const selectedPlayer = computedPlayers.find((player) => player.id === selectedPlayerId) ?? computedPlayers[0]
+  const selectedPlayer = computedPlayers.find((player) => player.id === selectedPlayerId) ?? null
   const teamsEven = recordState.teamA.length === recordState.teamB.length
   const teamsFull = recordState.teamA.length === TEAM_SIZE && recordState.teamB.length === TEAM_SIZE
   const canSave = teamsEven && teamsFull && recordState.winner !== null
@@ -820,7 +820,7 @@ function App() {
               players={filteredPlayers}
               playerQuery={playerQuery}
               selectedPlayer={selectedPlayer}
-              selectedPlayerId={selectedPlayer.id}
+              selectedPlayerId={selectedPlayerId}
               onSearchChange={setPlayerQuery}
               onSelectPlayer={setSelectedPlayerId}
               onAddPlayer={runAddPlayer}
@@ -1577,8 +1577,8 @@ function HistoryTeam({ title, tone, players }: { title: string; tone: 'blue' | '
 function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId, onSearchChange, onSelectPlayer, onAddPlayer, onRenamePlayer, onSetPlayerTeamVisibility, onProtectedAction }: {
   players: PlayerCard[]
   playerQuery: string
-  selectedPlayer: PlayerCard
-  selectedPlayerId: string
+  selectedPlayer: PlayerCard | null
+  selectedPlayerId: string | null
   onSearchChange: (value: string) => void
   onSelectPlayer: (playerId: string) => void
   onAddPlayer: () => void
@@ -1617,11 +1617,15 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
             ))}
           </CardContent>
         </Card>
-        <div className="hidden md:block">
-          <PlayerDetail key={selectedPlayer.id} player={selectedPlayer} onRenamePlayer={onRenamePlayer} onSetPlayerTeamVisibility={onSetPlayerTeamVisibility} onProtectedAction={onProtectedAction} />
-        </div>
+        {selectedPlayer && (
+          <div className="hidden md:block">
+            <PlayerDetail key={selectedPlayer.id} player={selectedPlayer} onRenamePlayer={onRenamePlayer} onSetPlayerTeamVisibility={onSetPlayerTeamVisibility} onProtectedAction={onProtectedAction} />
+          </div>
+        )}
       </div>
-      <PlayerDetailSheet open={isSheetOpen} player={selectedPlayer} onClose={() => setIsSheetOpen(false)} onRenamePlayer={onRenamePlayer} onSetPlayerTeamVisibility={onSetPlayerTeamVisibility} onProtectedAction={onProtectedAction} />
+      {selectedPlayer && (
+        <PlayerDetailSheet open={isSheetOpen} player={selectedPlayer} onClose={() => setIsSheetOpen(false)} onRenamePlayer={onRenamePlayer} onSetPlayerTeamVisibility={onSetPlayerTeamVisibility} onProtectedAction={onProtectedAction} />
+      )}
     </section>
   )
 }
