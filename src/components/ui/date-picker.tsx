@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { format } from "date-fns"
-import { id } from "date-fns/locale"
+import { id as indonesianLocale } from "date-fns/locale"
+import { ChevronDown } from "lucide-react"
 
 import { CalendarIcon } from "@/icons"
 import { cn } from "@/lib/utils"
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/popover"
 
 type DatePickerProps = {
+  id?: string
   value: string
   onChange: (value: string) => void
 }
@@ -32,7 +34,7 @@ function parseDateValue(value: string) {
   return new Date(year, month - 1, day)
 }
 
-function DatePicker({ value, onChange }: DatePickerProps) {
+function DatePicker({ id, value, onChange }: DatePickerProps) {
   const [open, setOpen] = useState(false)
   const date = parseDateValue(value)
 
@@ -49,16 +51,18 @@ function DatePicker({ value, onChange }: DatePickerProps) {
         render={
           <Button
             type="button"
+            id={id}
             variant="outline"
             data-empty={!date}
-            className="h-12 w-full justify-start rounded-3xl bg-input/50 text-left font-normal data-[empty=true]:text-muted-foreground"
+            className="h-12 w-full justify-start rounded-2xl bg-background px-4 text-left font-normal shadow-none data-[empty=true]:text-muted-foreground"
           />
         }
       >
         <CalendarIcon data-icon="inline-start" />
         <span className={cn(!date && "text-muted-foreground")}>
-          {date ? format(date, "PPP", { locale: id }) : "Pilih tanggal"}
+          {date ? format(date, "PPP", { locale: indonesianLocale }) : "Pilih tanggal"}
         </span>
+        <ChevronDown className="ml-auto size-4 text-muted-foreground" aria-hidden="true" />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-0">
         <Calendar

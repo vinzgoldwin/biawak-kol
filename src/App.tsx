@@ -24,7 +24,7 @@ import {
   type PlayerCard,
   type RosterPlayer,
 } from './data'
-import { EllipsisVertical, EyeIcon, EyeOff, NotebookPen } from 'lucide-react'
+import { ArrowLeftRight, EllipsisVertical, EyeIcon, EyeOff, GripVertical, NotebookPen, UserRound, X } from 'lucide-react'
 import {
   BarChartIcon,
   CheckCircleIcon,
@@ -36,6 +36,7 @@ import {
   PlusIcon,
   SearchIcon,
   TrashIcon,
+  TrophyIcon,
   UsersIcon,
   type IconComponent,
 } from './icons'
@@ -550,6 +551,15 @@ function App() {
     })
   }
 
+  const swapTeams = () => {
+    setRecordState((current) => ({
+      ...current,
+      teamA: current.teamB,
+      teamB: current.teamA,
+      winner: current.winner === 'A' ? 'B' : current.winner === 'B' ? 'A' : null,
+    }))
+  }
+
   const loadGameIntoRecorder = (game: HistoryGame) => {
     runProtectedAction(`Edit Game #${game.id}`, () => {
       setRecordState({
@@ -775,6 +785,7 @@ function App() {
               onDateChange={(dateValue) => setRecordState((current) => ({ ...current, dateValue }))}
               onAddPlayer={addPlayerToTeam}
               onRemovePlayer={removePlayerFromTeam}
+              onSwapTeams={swapTeams}
               onWinnerChange={(winner) => setRecordState((current) => ({ ...current, winner }))}
               onSave={saveGame}
             />
@@ -1169,7 +1180,7 @@ function LeaderboardTable({ rows, ranked = false, animationKey }: { rows: Leader
   )
 }
 
-function RecordScreen({ recordState, availablePlayers, editingGameId, teamsFull, canSave, onSearchChange, onDateChange, onAddPlayer, onRemovePlayer, onWinnerChange, onSave }: {
+function RecordScreen({ recordState, availablePlayers, editingGameId, teamsFull, canSave, onSearchChange, onDateChange, onAddPlayer, onRemovePlayer, onSwapTeams, onWinnerChange, onSave }: {
   recordState: RecordState
   availablePlayers: string[]
   editingGameId: number | null
@@ -1179,6 +1190,7 @@ function RecordScreen({ recordState, availablePlayers, editingGameId, teamsFull,
   onDateChange: (value: string) => void
   onAddPlayer: (playerName: string, team: Winner) => void
   onRemovePlayer: (playerName: string, team: Winner) => void
+  onSwapTeams: () => void
   onWinnerChange: (winner: Winner) => void
   onSave: () => void
 }) {
@@ -1196,14 +1208,10 @@ function RecordScreen({ recordState, availablePlayers, editingGameId, teamsFull,
       <h1 className="py-3 text-center font-heading text-lg font-semibold">
         {editingGameId === null ? 'Catat Game' : `Edit Game #${editingGameId}`}
       </h1>
-      <Card size="sm" className="rounded-3xl shadow-sm">
-        <CardHeader>
-          <CardTitle>Tanggal</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DatePicker value={recordState.dateValue} onChange={onDateChange} />
-        </CardContent>
-      </Card>
+      <div className="grid gap-2">
+        <label htmlFor="game-date" className="px-1 text-sm font-semibold">Tanggal</label>
+        <DatePicker id="game-date" value={recordState.dateValue} onChange={onDateChange} />
+      </div>
 
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -1215,50 +1223,72 @@ function RecordScreen({ recordState, availablePlayers, editingGameId, teamsFull,
           <h2 className="text-sm font-semibold">Pemain Tersedia</h2>
           <span className="text-xs text-muted-foreground">tap pemain, lalu pilih tim</span>
         </div>
-        <div className="grid grid-cols-4 gap-2 md:grid-cols-8">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
           {availablePlayers.map((player, index) => (
-            <Card key={player} size="sm" className="relative min-h-20 rounded-3xl py-0 text-center shadow-sm">
-              <CardContent className="grid h-full px-0">
-                {teamPickerPlayer === player ? (
-                  <div className="grid grid-cols-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-20 rounded-none border-r border-border text-xs font-semibold text-primary hover:bg-primary/10"
-                      disabled={teamAFull}
-                      onClick={() => addPlayerAndClosePicker(player, 'A')}
-                    >
-                      Tim A
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-20 rounded-none text-xs font-semibold text-chart-3 hover:bg-chart-3/10"
-                      disabled={teamBFull}
-                      onClick={() => addPlayerAndClosePicker(player, 'B')}
-                    >
-                      Tim B
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="grid h-20 w-full justify-items-center gap-1 rounded-3xl px-1 py-3 text-center"
-                    onClick={() => setTeamPickerPlayer(player)}
-                  >
-                    <PlayerAvatar name={player} seed={index} />
-                    <strong className="max-w-full truncate text-xs font-medium">{player}</strong>
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+            teamPickerPlayer === player ? (
+              <div key={player} className="flex h-11 min-w-0 overflow-hidden rounded-full border bg-background shadow-sm" aria-label={`Pilih tim untuk ${player}`}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-full min-w-0 flex-1 rounded-none border-r px-1 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
+                  disabled={teamAFull}
+                  onClick={() => addPlayerAndClosePicker(player, 'A')}
+                >
+                  Tim A
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-full min-w-0 flex-1 rounded-none px-1 text-xs font-semibold text-chart-3 hover:bg-chart-3/10 hover:text-chart-3"
+                  disabled={teamBFull}
+                  onClick={() => addPlayerAndClosePicker(player, 'B')}
+                >
+                  Tim B
+                </Button>
+              </div>
+            ) : (
+              <Button
+                key={player}
+                type="button"
+                variant="outline"
+                className="h-11 w-full min-w-0 justify-start gap-2 rounded-full px-2 shadow-sm"
+                aria-label={`Pilih ${player}`}
+                onClick={() => setTeamPickerPlayer(player)}
+              >
+                <PlayerAvatar name={player} seed={index} />
+                <strong className="min-w-0 flex-1 truncate text-left text-sm font-medium">{player}</strong>
+              </Button>
+            )
           ))}
+          {availablePlayers.length === 0 && (
+            <p className="w-full rounded-xl border px-4 py-6 text-center text-sm text-muted-foreground">
+              Tidak ada pemain yang tersedia.
+            </p>
+          )}
         </div>
       </section>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-4 py-2 sm:grid-cols-[1fr_auto_1fr] sm:gap-5">
         <TeamBox title="Tim A" tone="blue" players={recordState.teamA} teamSize={TEAM_SIZE} onRemove={(name) => onRemovePlayer(name, 'A')} />
+        <div className="relative hidden w-px bg-border sm:block">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="absolute left-1/2 top-1/2 size-10 -translate-x-1/2 -translate-y-1/2 rounded-xl bg-background text-muted-foreground shadow-none"
+            aria-label="Tukar Tim A dan Tim B"
+            onClick={onSwapTeams}
+          >
+            <ArrowLeftRight />
+          </Button>
+        </div>
+        <div className="flex items-center gap-3 sm:hidden">
+          <div className="h-px flex-1 bg-border" />
+          <Button type="button" variant="outline" size="sm" className="rounded-xl text-muted-foreground" onClick={onSwapTeams}>
+            <ArrowLeftRight /> Tukar tim
+          </Button>
+          <div className="h-px flex-1 bg-border" />
+        </div>
         <TeamBox title="Tim B" tone="yellow" players={recordState.teamB} teamSize={TEAM_SIZE} onRemove={(name) => onRemovePlayer(name, 'B')} />
       </div>
 
@@ -1267,13 +1297,17 @@ function RecordScreen({ recordState, availablePlayers, editingGameId, teamsFull,
           <CardTitle>Pemenang</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-3">
-          <Button type="button" variant={recordState.winner === 'A' ? 'default' : 'outline'} className="h-12" onClick={() => onWinnerChange('A')}>Tim A</Button>
+          <Button type="button" variant={recordState.winner === 'A' ? 'default' : 'outline'} className="h-12" onClick={() => onWinnerChange('A')}>
+            <TrophyIcon data-icon="inline-start" />
+            Tim A
+          </Button>
           <Button
             type="button"
             variant="outline"
             className={recordState.winner === 'B' ? 'h-12 bg-chart-3 text-white border-chart-3 hover:bg-chart-3/90 hover:text-white' : 'h-12'}
             onClick={() => onWinnerChange('B')}
           >
+            <TrophyIcon data-icon="inline-start" />
             Tim B
           </Button>
         </CardContent>
@@ -1289,25 +1323,33 @@ function RecordScreen({ recordState, availablePlayers, editingGameId, teamsFull,
 }
 
 function TeamBox({ title, tone, players, teamSize, onRemove }: { title: string; tone: 'blue' | 'yellow'; players: string[]; teamSize: number; onRemove: (name: string) => void }) {
+  const toneClassName = tone === 'blue' ? 'text-primary' : 'text-chart-3'
+
   return (
-    <Card size="sm" className="rounded-3xl shadow-sm">
-      <CardHeader>
-        <CardTitle className={tone === 'blue' ? 'text-primary' : 'text-chart-3'}>{title}</CardTitle>
-        <CardAction><Badge variant="secondary">{players.length}</Badge></CardAction>
-      </CardHeader>
-      <CardContent className="grid gap-2">
+    <section className="min-w-0">
+      <header className="mb-3 flex items-center gap-2 px-1">
+        <UserRound className={cn('size-5', toneClassName)} />
+        <h3 className={cn('font-heading text-base font-semibold', toneClassName)}>{title}</h3>
+        <span className="ml-auto rounded-lg bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">
+          {players.length}/{teamSize}
+        </span>
+      </header>
+      <div className="overflow-hidden rounded-2xl border bg-background">
         {players.map((player, index) => (
-          <Button key={player} type="button" variant="outline" className="h-auto min-h-9 justify-start rounded-2xl px-2 py-1 text-left text-xs" onClick={() => onRemove(player)}>
+          <div key={player} className="flex min-h-11 items-center gap-2 border-b px-2.5 last:border-b-0">
+            <GripVertical className="size-4 shrink-0 text-muted-foreground/60" aria-hidden="true" />
             <PlayerAvatar name={player} seed={index} />
-            <span className="truncate">{player}</span>
-            <span className="ml-auto text-muted-foreground">x</span>
-          </Button>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">{player}</span>
+            <Button type="button" variant="ghost" size="icon-sm" className="rounded-lg text-muted-foreground hover:text-foreground" aria-label={`Hapus ${player} dari ${title}`} onClick={() => onRemove(player)}>
+              <X />
+            </Button>
+          </div>
         ))}
         {Array.from({ length: Math.max(teamSize - players.length, 0) }).map((_, index) => (
-          <div key={index} className="flex min-h-9 items-center rounded-2xl border border-dashed px-3 text-xs text-muted-foreground">Slot kosong</div>
+          <div key={index} className="flex min-h-11 items-center border-b px-3 text-sm text-muted-foreground/65 last:border-b-0">Slot kosong</div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }
 
