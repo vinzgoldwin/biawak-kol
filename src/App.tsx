@@ -17,6 +17,7 @@ import {
   historySeed,
   navItems,
   playerDirectory,
+  reconcileRosterSeed,
   seedStatsMonth,
   type HistoryGame,
   type LeaderboardRow,
@@ -325,7 +326,9 @@ function App() {
   const [activeScreen, setActiveScreen] = useState<NavKey>(getStoredActiveScreen)
   const [recordState, setRecordState] = useState<RecordState>(createEmptyRecordState)
   const [historyGames, setHistoryGames] = useState<HistoryGame[]>(() => readStoredArray(HISTORY_STORAGE_KEY, historySeed, isHistoryGame))
-  const [rosterPlayers, setRosterPlayers] = useState<RosterPlayer[]>(() => readStoredArray(ROSTER_STORAGE_KEY, playerDirectory, isRosterPlayer))
+  const [rosterPlayers, setRosterPlayers] = useState<RosterPlayer[]>(() => (
+    reconcileRosterSeed(readStoredArray(ROSTER_STORAGE_KEY, playerDirectory, isRosterPlayer))
+  ))
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
   const [playerQuery, setPlayerQuery] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue)
@@ -340,7 +343,7 @@ function App() {
 
   const applySharedState = useCallback((sharedState: SharedState) => {
     setHistoryGames(sharedState.historyGames)
-    setRosterPlayers(sharedState.rosterPlayers)
+    setRosterPlayers(reconcileRosterSeed(sharedState.rosterPlayers))
     setRemoteVersion(sharedState.version)
   }, [])
 
@@ -1159,6 +1162,10 @@ function LeaderboardTable({ rows, ranked = false, animationKey }: { rows: Leader
       <TableBody key={animationKey} className="leaderboard-motion-group">
         {rows.map((player, index) => {
           const rank = index + 1
+          const nameCharacters = Array.from(player.name)
+          const mobileName = nameCharacters.length > 8
+            ? `${nameCharacters.slice(0, 8).join('')}…`
+            : player.name
           const rankClassName = cn(
             'inline-grid h-7 min-w-7 place-items-center px-1.5 text-[11px] font-semibold tabular-nums',
             rank === 1 && 'text-yellow-700',
@@ -1175,7 +1182,11 @@ function LeaderboardTable({ rows, ranked = false, animationKey }: { rows: Leader
                 </TableCell>
               )}
               <TableCell>
-                <span className="flex items-center gap-2 font-medium"><PlayerAvatar name={player.name} seed={index} />{player.name}</span>
+                <span className="flex items-center gap-2 font-medium">
+                  <PlayerAvatar name={player.name} seed={index} />
+                  <span className="sm:hidden" title={player.name}>{mobileName}</span>
+                  <span className="hidden sm:inline">{player.name}</span>
+                </span>
               </TableCell>
               <TableCell>{player.games}</TableCell>
               <TableCell>{player.wins}</TableCell>
@@ -1493,16 +1504,17 @@ function HistoryScreen({ games, monthOptions, selectedMonth, onMonthChange, onEd
           </Card>
         )}
         {games.map((game) => (
-          <Card key={game.id} size="sm" className="rounded-3xl shadow-sm">
-            <CardHeader className="grid-cols-[minmax(0,1fr)_auto]">
-              <div>
-                <CardTitle>Game #{game.id}</CardTitle>
-                <p className="text-xs text-muted-foreground">{game.dateShort}</p>
-              </div>
-              <CardAction>
+          <Card key={game.id} size="sm" className="relative gap-0 overflow-hidden rounded-2xl py-0 shadow-sm md:grid md:grid-cols-[9rem_minmax(0,1fr)]">
+            <div className="flex items-center justify-between gap-3 bg-muted/35 px-4 py-3 md:flex-col md:items-start md:justify-center md:border-r md:px-6 md:py-5">
+              <CardTitle className="font-semibold">Match {game.id}</CardTitle>
+              <p className="text-xs font-medium text-muted-foreground">{game.dateShort}</p>
+            </div>
+
+            <div className="relative grid gap-4 px-4 py-4 pr-12 md:px-6 md:py-5 md:pr-14">
+              <CardAction className="absolute right-3 top-3 md:right-4 md:top-4">
                 <Menu.Root>
                   <Menu.Trigger
-                    className="inline-flex size-8 items-center justify-center rounded-2xl outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/30 data-[popup-open]:bg-muted"
+                    className="inline-flex size-8 items-center justify-center outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-ring/30"
                     aria-label={`Kelola Game #${game.id}`}
                   >
                     <EllipsisVertical className="size-4" />
@@ -1523,19 +1535,20 @@ function HistoryScreen({ games, monthOptions, selectedMonth, onMonthChange, onEd
                   </Menu.Portal>
                 </Menu.Root>
               </CardAction>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              <div>
-                <Badge variant={game.winner === 'A' ? 'default' : 'outline'} className={game.winner === 'A' ? '' : 'border-chart-3/20 bg-chart-3/10 text-chart-3'}>
+
+              <div className="flex">
+                <Badge variant={game.winner === 'A' ? 'default' : 'outline'} className={game.winner === 'A' ? 'gap-1.5' : 'gap-1.5 border-chart-3/20 bg-chart-3/10 text-chart-3'}>
+                  <TrophyIcon className="size-3.5" />
                   Tim {game.winner} menang
                 </Badge>
               </div>
-              <div className="grid grid-cols-[1fr_1.75rem_1fr] items-center gap-2">
-                <HistoryTeam title="Tim A" tone="blue" players={game.teamA} />
-                <span className="text-center text-xs font-semibold">VS</span>
+
+              <div className="grid grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-center gap-3">
+                <HistoryTeam title="Tim A" tone="green" players={game.teamA} />
+                <span className="text-center font-heading text-base font-semibold">VS</span>
                 <HistoryTeam title="Tim B" tone="yellow" players={game.teamB} />
               </div>
-            </CardContent>
+            </div>
           </Card>
         ))}
       </div>
@@ -1565,10 +1578,10 @@ function HistoryScreen({ games, monthOptions, selectedMonth, onMonthChange, onEd
   )
 }
 
-function HistoryTeam({ title, tone, players }: { title: string; tone: 'blue' | 'yellow'; players: string[] }) {
+function HistoryTeam({ title, tone, players }: { title: string; tone: 'green' | 'yellow'; players: string[] }) {
   return (
-    <div>
-      <h3 className={tone === 'blue' ? 'text-xs font-semibold text-primary' : 'text-xs font-semibold text-chart-3'}>{title}</h3>
+    <div className="min-w-0">
+      <h3 className={tone === 'green' ? 'text-xs font-semibold text-primary' : 'text-xs font-semibold text-chart-3'}>{title}</h3>
       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{players.join(', ')}</p>
     </div>
   )
