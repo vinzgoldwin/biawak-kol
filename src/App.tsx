@@ -1146,7 +1146,7 @@ function LeaderboardTable({ rows, ranked = false, animationKey }: { rows: Leader
     <Table className="min-w-[390px] text-xs">
       <TableHeader>
         <TableRow>
-          {ranked && <TableHead className="w-10">No</TableHead>}
+          {ranked && <TableHead className="w-10 text-center">No</TableHead>}
           <TableHead>Pemain</TableHead>
           <TableHead>G</TableHead>
           <TableHead>M</TableHead>
