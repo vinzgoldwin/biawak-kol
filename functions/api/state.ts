@@ -14,6 +14,7 @@ type HistoryGame = {
 type RosterPlayer = {
   id: string
   name: string
+  isHiddenFromTeams?: boolean
   seedStats?: {
     games: number
     wins: number
@@ -82,6 +83,7 @@ function isRosterPlayer(value: unknown): value is RosterPlayer {
   return (
     typeof value.id === 'string'
     && typeof value.name === 'string'
+    && (value.isHiddenFromTeams === undefined || typeof value.isHiddenFromTeams === 'boolean')
     && (value.seedStats === undefined || isSeedStats(value.seedStats))
   )
 }

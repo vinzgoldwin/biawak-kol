@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type RefObject } from 'react'
+import { AlertDialog } from '@base-ui/react/alert-dialog'
+import { Menu } from '@base-ui/react/menu'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { toBlob } from 'html-to-image'
@@ -15,13 +17,14 @@ import {
   historySeed,
   navItems,
   playerDirectory,
+  seedStatsMonth,
   type HistoryGame,
   type LeaderboardRow,
   type NavKey,
   type PlayerCard,
   type RosterPlayer,
 } from './data'
-import { NotebookPen } from 'lucide-react'
+import { EllipsisVertical, EyeIcon, EyeOff, NotebookPen } from 'lucide-react'
 import {
   BarChartIcon,
   CheckCircleIcon,
@@ -45,6 +48,7 @@ const TEAM_SIZE = 5
 const HISTORY_STORAGE_KEY = 'biawak-kol.historyGames'
 const ROSTER_STORAGE_KEY = 'biawak-kol.rosterPlayers'
 const PROTECTED_PASSWORD_STORAGE_KEY = 'biawak-kol.protectedPassword'
+const ACTIVE_SCREEN_STORAGE_KEY = 'biawak-kol.activeScreen'
 
 type RecordState = {
   dateValue: string
@@ -231,7 +235,11 @@ function isHistoryGame(value: unknown): value is HistoryGame {
 function isRosterPlayer(value: unknown): value is RosterPlayer {
   if (!isRecord(value)) return false
 
-  return typeof value.id === 'string' && typeof value.name === 'string'
+  return (
+    typeof value.id === 'string'
+    && typeof value.name === 'string'
+    && (value.isHiddenFromTeams === undefined || typeof value.isHiddenFromTeams === 'boolean')
+  )
 }
 
 function readStoredArray<T>(key: string, fallback: T[], isItem: (item: unknown) => item is T) {
@@ -282,8 +290,33 @@ function clearProtectedAccess() {
   }
 }
 
+function isPersistentNavKey(value: string): value is Exclude<NavKey, 'saved'> {
+  return value === 'dashboard' || value === 'record' || value === 'history' || value === 'players'
+}
+
+function getStoredActiveScreen(): NavKey {
+  if (typeof window === 'undefined') return 'dashboard'
+
+  try {
+    const storedValue = window.localStorage.getItem(ACTIVE_SCREEN_STORAGE_KEY)
+    return storedValue !== null && isPersistentNavKey(storedValue) ? storedValue : 'dashboard'
+  } catch {
+    return 'dashboard'
+  }
+}
+
+function storeActiveScreen(screen: NavKey) {
+  if (screen === 'saved') return
+
+  try {
+    window.localStorage.setItem(ACTIVE_SCREEN_STORAGE_KEY, screen)
+  } catch {
+    // Losing persistence only resets navigation to Beranda after a refresh.
+  }
+}
+
 function App() {
-  const [activeScreen, setActiveScreen] = useState<NavKey>('dashboard')
+  const [activeScreen, setActiveScreen] = useState<NavKey>(getStoredActiveScreen)
   const [recordState, setRecordState] = useState<RecordState>(createEmptyRecordState)
   const [historyGames, setHistoryGames] = useState<HistoryGame[]>(() => readStoredArray(HISTORY_STORAGE_KEY, historySeed, isHistoryGame))
   const [rosterPlayers, setRosterPlayers] = useState<RosterPlayer[]>(() => readStoredArray(ROSTER_STORAGE_KEY, playerDirectory, isRosterPlayer))
@@ -291,6 +324,7 @@ function App() {
   const [playerQuery, setPlayerQuery] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue)
   const [undoToast, setUndoToast] = useState<UndoToast | null>(null)
+  const [dismissingUndoToastId, setDismissingUndoToastId] = useState<number | null>(null)
   const [editingGameId, setEditingGameId] = useState<number | null>(null)
   const [pendingProtectedAction, setPendingProtectedAction] = useState<PendingProtectedAction | null>(null)
   const [isCopyingImage, setIsCopyingImage] = useState(false)
@@ -388,14 +422,27 @@ function App() {
   }, [rosterPlayers])
 
   useEffect(() => {
+    storeActiveScreen(activeScreen)
+  }, [activeScreen])
+
+  const dismissUndoToast = useCallback((toastId: number) => {
+    setDismissingUndoToastId(toastId)
+
+    window.setTimeout(() => {
+      setUndoToast((current) => (current?.id === toastId ? null : current))
+      setDismissingUndoToastId((current) => (current === toastId ? null : current))
+    }, 180)
+  }, [])
+
+  useEffect(() => {
     if (undoToast === null) return undefined
 
     const timeoutId = window.setTimeout(() => {
-      setUndoToast((current) => (current?.id === undoToast.id ? null : current))
+      dismissUndoToast(undoToast.id)
     }, 6000)
 
     return () => window.clearTimeout(timeoutId)
-  }, [undoToast])
+  }, [dismissUndoToast, undoToast])
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' })
@@ -406,7 +453,10 @@ function App() {
     () => historyGames.filter((game) => toGameMonthValue(game.dateLabel) === selectedMonth),
     [historyGames, selectedMonth],
   )
-  const dashboardPlayers = useMemo(() => buildPlayerStats(rosterPlayers, dashboardGames), [dashboardGames, rosterPlayers])
+  const dashboardPlayers = useMemo(
+    () => buildPlayerStats(rosterPlayers, dashboardGames, { includeSeedStats: selectedMonth === seedStatsMonth }),
+    [dashboardGames, rosterPlayers, selectedMonth],
+  )
   const dashboardLeaderboard = useMemo(() => buildLeaderboard(dashboardPlayers), [dashboardPlayers])
   const dashboardSummaryStats = useMemo(
     () => buildDashboardSummary(dashboardGames, dashboardPlayers, dashboardLeaderboard),
@@ -430,6 +480,7 @@ function App() {
   const availablePlayers = useMemo(() => {
     const query = recordState.search.trim().toLowerCase()
     return rosterPlayers
+      .filter((player) => player.isHiddenFromTeams !== true)
       .map((player) => player.name)
       .filter((player) => !assignedPlayers.has(player) && (query === '' || player.toLowerCase().includes(query)))
   }, [assignedPlayers, recordState.search, rosterPlayers])
@@ -644,6 +695,29 @@ function App() {
   }
 
   const runRenamePlayer = (playerId: string, nextName: string) => renamePlayer(playerId, nextName)
+
+  const setPlayerTeamVisibility = async (playerId: string, isHiddenFromTeams: boolean) => {
+    if (isSyncing) return false
+
+    const currentPlayer = rosterPlayers.find((player) => player.id === playerId)
+    if (!currentPlayer) return false
+    if ((currentPlayer.isHiddenFromTeams === true) === isHiddenFromTeams) return true
+
+    const nextRosterPlayers = rosterPlayers.map((player) => (
+      player.id === playerId ? { ...player, isHiddenFromTeams } : player
+    ))
+
+    return (await persistSharedState(historyGames, nextRosterPlayers)) !== null
+  }
+
+  const runSetPlayerTeamVisibility = (playerId: string, isHiddenFromTeams: boolean) => {
+    const player = rosterPlayers.find((rosterPlayer) => rosterPlayer.id === playerId)
+    const title = `${isHiddenFromTeams ? 'Sembunyikan' : 'Tampilkan'} ${player?.name ?? 'Pemain'}`
+    runProtectedAction(title, async () => {
+      await setPlayerTeamVisibility(playerId, isHiddenFromTeams)
+    })
+  }
+
   const copyLeaderboardImage = async () => {
     if (!imageExportRef.current || isCopyingImage) return
 
@@ -677,60 +751,63 @@ function App() {
           <Brand />
         </header>
 
-        {activeScreen === 'dashboard' && (
-          <DashboardScreen
-            summaryStats={dashboardSummaryStats}
-            leaderboardRows={dashboardLeaderboard.all}
-            monthOptions={monthOptions}
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-            onRecordNewGame={() => runProtectedAction('Buka Catat Game', openBlankRecorder)}
-            onCopyImage={copyLeaderboardImage}
-            isCopyingImage={isCopyingImage}
-          />
-        )}
-        {activeScreen === 'record' && (
-          <RecordScreen
-            recordState={recordState}
-            availablePlayers={availablePlayers}
-            editingGameId={editingGameId}
-            teamsFull={teamsFull}
-            canSave={canSave && !isSyncing}
-            onSearchChange={(search) => setRecordState((current) => ({ ...current, search }))}
-            onDateChange={(dateValue) => setRecordState((current) => ({ ...current, dateValue }))}
-            onAddPlayer={addPlayerToTeam}
-            onRemovePlayer={removePlayerFromTeam}
-            onWinnerChange={(winner) => setRecordState((current) => ({ ...current, winner }))}
-            onSave={saveGame}
-          />
-        )}
-        {activeScreen === 'saved' && (
-          <SavedScreen recordState={recordState} onRecordAgain={() => runProtectedAction('Buka Catat Game', openBlankRecorder)} onViewLeaderboard={() => setActiveScreen('dashboard')} />
-        )}
-        {activeScreen === 'history' && (
-          <HistoryScreen
-            games={filteredHistoryGames}
-            monthOptions={monthOptions}
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-            onEdit={loadGameIntoRecorder}
-            onRecordMore={() => runProtectedAction('Buka Catat Game', openBlankRecorder)}
-            onRemove={removeGame}
-          />
-        )}
-        {activeScreen === 'players' && (
-          <PlayersScreen
-            players={filteredPlayers}
-            playerQuery={playerQuery}
-            selectedPlayer={selectedPlayer}
-            selectedPlayerId={selectedPlayer.id}
-            onSearchChange={setPlayerQuery}
-            onSelectPlayer={setSelectedPlayerId}
-            onAddPlayer={runAddPlayer}
-            onRenamePlayer={runRenamePlayer}
-            onProtectedAction={runProtectedAction}
-          />
-        )}
+        <div key={activeScreen} className="screen-motion">
+          {activeScreen === 'dashboard' && (
+            <DashboardScreen
+              summaryStats={dashboardSummaryStats}
+              leaderboardRows={dashboardLeaderboard.all}
+              monthOptions={monthOptions}
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              onRecordNewGame={() => runProtectedAction('Buka Catat Game', openBlankRecorder)}
+              onCopyImage={copyLeaderboardImage}
+              isCopyingImage={isCopyingImage}
+            />
+          )}
+          {activeScreen === 'record' && (
+            <RecordScreen
+              recordState={recordState}
+              availablePlayers={availablePlayers}
+              editingGameId={editingGameId}
+              teamsFull={teamsFull}
+              canSave={canSave && !isSyncing}
+              onSearchChange={(search) => setRecordState((current) => ({ ...current, search }))}
+              onDateChange={(dateValue) => setRecordState((current) => ({ ...current, dateValue }))}
+              onAddPlayer={addPlayerToTeam}
+              onRemovePlayer={removePlayerFromTeam}
+              onWinnerChange={(winner) => setRecordState((current) => ({ ...current, winner }))}
+              onSave={saveGame}
+            />
+          )}
+          {activeScreen === 'saved' && (
+            <SavedScreen recordState={recordState} onRecordAgain={() => runProtectedAction('Buka Catat Game', openBlankRecorder)} onViewLeaderboard={() => setActiveScreen('dashboard')} />
+          )}
+          {activeScreen === 'history' && (
+            <HistoryScreen
+              games={filteredHistoryGames}
+              monthOptions={monthOptions}
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              onEdit={loadGameIntoRecorder}
+              onRecordMore={() => runProtectedAction('Buka Catat Game', openBlankRecorder)}
+              onRemove={removeGame}
+            />
+          )}
+          {activeScreen === 'players' && (
+            <PlayersScreen
+              players={filteredPlayers}
+              playerQuery={playerQuery}
+              selectedPlayer={selectedPlayer}
+              selectedPlayerId={selectedPlayer.id}
+              onSearchChange={setPlayerQuery}
+              onSelectPlayer={setSelectedPlayerId}
+              onAddPlayer={runAddPlayer}
+              onRenamePlayer={runRenamePlayer}
+              onSetPlayerTeamVisibility={runSetPlayerTeamVisibility}
+              onProtectedAction={runProtectedAction}
+            />
+          )}
+        </div>
       </main>
 
       {undoToast && (
@@ -738,7 +815,8 @@ function App() {
           message={undoToast.message}
           actionLabel={undoToast.actionLabel}
           onAction={undoLastAction}
-          onDismiss={() => setUndoToast(null)}
+          isDismissing={dismissingUndoToastId === undoToast.id}
+          onDismiss={() => dismissUndoToast(undoToast.id)}
         />
       )}
       {pendingProtectedAction && (
@@ -804,14 +882,18 @@ function PasswordGateDialog({ title, onUnlock, onCancel }: {
   )
 }
 
-function UndoToastView({ message, actionLabel, onAction, onDismiss }: {
+function UndoToastView({ message, actionLabel, isDismissing, onAction, onDismiss }: {
   message: string
   actionLabel: string
+  isDismissing: boolean
   onAction: () => void
   onDismiss: () => void
 }) {
   return (
-    <div className="fixed inset-x-3 bottom-[5.75rem] z-30 mx-auto flex max-w-[430px] items-center gap-3 rounded-3xl border bg-foreground px-4 py-3 text-background shadow-xl md:bottom-6 md:left-auto md:right-6 md:mx-0 md:w-96 md:max-w-none" role="status" aria-live="polite">
+    <div className={cn(
+      'undo-toast fixed inset-x-3 bottom-[5.75rem] z-30 mx-auto flex max-w-[430px] items-center gap-3 rounded-3xl border bg-foreground px-4 py-3 text-background shadow-xl md:bottom-6 md:left-auto md:right-6 md:mx-0 md:w-96 md:max-w-none',
+      isDismissing && 'is-dismissing',
+    )} role="status" aria-live="polite">
       <span className="min-w-0 flex-1 text-sm font-medium">{message}</span>
       <Button type="button" variant="secondary" size="sm" className="h-8 rounded-2xl px-3" onClick={onAction}>
         {actionLabel}
@@ -886,7 +968,7 @@ function DashboardScreen({ summaryStats, leaderboardRows, monthOptions, selected
           <SelectTrigger className="h-11 w-full bg-card font-medium">
             <SelectValue placeholder="Pilih bulan" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent align="start" alignItemWithTrigger={false}>
             <SelectGroup>
               {monthOptions.map((month) => (
                 <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
@@ -927,7 +1009,7 @@ function DashboardScreen({ summaryStats, leaderboardRows, monthOptions, selected
       {leaderboardRows.length > 0 ? (
         <Card className="rounded-2xl py-2 shadow-sm md:rounded-3xl">
           <CardContent className="px-0">
-            <LeaderboardTable rows={leaderboardRows} ranked />
+            <LeaderboardTable rows={leaderboardRows} ranked animationKey={selectedMonth} />
           </CardContent>
         </Card>
       ) : (
@@ -1037,7 +1119,7 @@ function LeaderboardImageExport({ players, selectedMonth, exportRef }: {
   )
 }
 
-function LeaderboardTable({ rows, ranked = false }: { rows: LeaderboardRow[]; ranked?: boolean }) {
+function LeaderboardTable({ rows, ranked = false, animationKey }: { rows: LeaderboardRow[]; ranked?: boolean; animationKey?: string }) {
   return (
     <Table className="min-w-[390px] text-xs">
       <TableHeader>
@@ -1052,7 +1134,7 @@ function LeaderboardTable({ rows, ranked = false }: { rows: LeaderboardRow[]; ra
           <TableHead>Persentase</TableHead>
         </TableRow>
       </TableHeader>
-      <TableBody>
+      <TableBody key={animationKey} className="leaderboard-motion-group">
         {rows.map((player, index) => {
           const rank = index + 1
           const rankClassName = cn(
@@ -1064,7 +1146,7 @@ function LeaderboardTable({ rows, ranked = false }: { rows: LeaderboardRow[]; ra
           )
 
           return (
-            <TableRow key={player.name}>
+            <TableRow key={player.name} className="leaderboard-row" style={{ '--row-index': index } as CSSProperties}>
               {ranked && (
                 <TableCell className="font-medium">
                   <span className={rankClassName}>{rank}</span>
@@ -1292,6 +1374,16 @@ function HistoryScreen({ games, monthOptions, selectedMonth, onMonthChange, onEd
   onRecordMore: () => void
   onRemove: (gameId: number) => void
 }) {
+  const [gamePendingDelete, setGamePendingDelete] = useState<HistoryGame | null>(null)
+
+  const confirmDelete = () => {
+    if (!gamePendingDelete) return
+
+    const gameId = gamePendingDelete.id
+    setGamePendingDelete(null)
+    onRemove(gameId)
+  }
+
   return (
     <section className="grid gap-4 md:max-w-3xl">
       <div className="grid gap-2 md:grid-cols-[12rem_1fr] md:items-center">
@@ -1299,7 +1391,7 @@ function HistoryScreen({ games, monthOptions, selectedMonth, onMonthChange, onEd
           <SelectTrigger className="h-11 w-full bg-card font-medium">
             <SelectValue placeholder="Pilih bulan" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent align="start" alignItemWithTrigger={false}>
             <SelectGroup>
               {monthOptions.map((month) => (
                 <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
@@ -1323,36 +1415,73 @@ function HistoryScreen({ games, monthOptions, selectedMonth, onMonthChange, onEd
         )}
         {games.map((game) => (
           <Card key={game.id} size="sm" className="rounded-3xl shadow-sm">
-            <CardHeader>
+            <CardHeader className="grid-cols-[minmax(0,1fr)_auto]">
               <div>
                 <CardTitle>Game #{game.id}</CardTitle>
                 <p className="text-xs text-muted-foreground">{game.dateShort}</p>
               </div>
               <CardAction>
-                <Badge variant={game.winner === 'A' ? 'default' : 'outline'} className={game.winner === 'A' ? '' : 'bg-chart-3/10 text-chart-3 border-chart-3/20'}>Tim {game.winner} menang</Badge>
+                <Menu.Root>
+                  <Menu.Trigger
+                    className="inline-flex size-8 items-center justify-center rounded-2xl outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/30 data-[popup-open]:bg-muted"
+                    aria-label={`Kelola Game #${game.id}`}
+                  >
+                    <EllipsisVertical className="size-4" />
+                  </Menu.Trigger>
+                  <Menu.Portal>
+                    <Menu.Positioner side="bottom" align="end" sideOffset={6} className="z-[70] outline-none">
+                      <Menu.Popup className="min-w-44 rounded-xl border bg-popover p-1 text-sm text-popover-foreground shadow-lg outline-none">
+                        <Menu.Item className="flex cursor-default items-center gap-2 rounded-lg px-3 py-2 outline-none data-[highlighted]:bg-muted" onClick={() => onEdit(game)}>
+                          <PencilIcon className="size-4" />
+                          Edit
+                        </Menu.Item>
+                        <Menu.Item className="flex cursor-default items-center gap-2 rounded-lg px-3 py-2 text-destructive outline-none data-[highlighted]:bg-destructive/10" onClick={() => setGamePendingDelete(game)}>
+                          <TrashIcon className="size-4" />
+                          Hapus
+                        </Menu.Item>
+                      </Menu.Popup>
+                    </Menu.Positioner>
+                  </Menu.Portal>
+                </Menu.Root>
               </CardAction>
             </CardHeader>
             <CardContent className="grid gap-3">
+              <div>
+                <Badge variant={game.winner === 'A' ? 'default' : 'outline'} className={game.winner === 'A' ? '' : 'border-chart-3/20 bg-chart-3/10 text-chart-3'}>
+                  Tim {game.winner} menang
+                </Badge>
+              </div>
               <div className="grid grid-cols-[1fr_1.75rem_1fr] items-center gap-2">
                 <HistoryTeam title="Tim A" tone="blue" players={game.teamA} />
                 <span className="text-center text-xs font-semibold">VS</span>
                 <HistoryTeam title="Tim B" tone="yellow" players={game.teamB} />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => onEdit(game)}>
-                  <PencilIcon data-icon="inline-start" />
-                  Edit
-                </Button>
-                <Button type="button" variant="destructive" size="sm" onClick={() => onRemove(game.id)}>
-                  <TrashIcon data-icon="inline-start" />
-                  Hapus
-                </Button>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
       <Button type="button" variant="outline" className="mx-auto w-1/2 min-w-44" onClick={onRecordMore}>Catat game lainnya</Button>
+      <AlertDialog.Root open={gamePendingDelete !== null} onOpenChange={(open) => !open && setGamePendingDelete(null)}>
+        <AlertDialog.Portal>
+          <AlertDialog.Backdrop className="fixed inset-0 z-[80] bg-background/70 backdrop-blur-sm" />
+          <AlertDialog.Viewport className="fixed inset-0 z-[80] grid place-items-center px-4">
+            <AlertDialog.Popup className="grid w-full max-w-sm gap-4 rounded-3xl border bg-card p-5 shadow-xl outline-none">
+              <div className="grid gap-1">
+                <AlertDialog.Title className="font-heading text-lg font-semibold">
+                  Hapus Game #{gamePendingDelete?.id}?
+                </AlertDialog.Title>
+                <AlertDialog.Description className="text-sm text-muted-foreground">
+                  Game akan dihapus dari riwayat dan statistik akan diperbarui. Tindakan ini masih dapat di-undo.
+                </AlertDialog.Description>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <AlertDialog.Close render={<Button type="button" variant="outline" />}>Batal</AlertDialog.Close>
+                <Button type="button" variant="destructive" onClick={confirmDelete}>Hapus</Button>
+              </div>
+            </AlertDialog.Popup>
+          </AlertDialog.Viewport>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
     </section>
   )
 }
@@ -1366,7 +1495,7 @@ function HistoryTeam({ title, tone, players }: { title: string; tone: 'blue' | '
   )
 }
 
-function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId, onSearchChange, onSelectPlayer, onAddPlayer, onRenamePlayer, onProtectedAction }: {
+function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId, onSearchChange, onSelectPlayer, onAddPlayer, onRenamePlayer, onSetPlayerTeamVisibility, onProtectedAction }: {
   players: PlayerCard[]
   playerQuery: string
   selectedPlayer: PlayerCard
@@ -1375,6 +1504,7 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
   onSelectPlayer: (playerId: string) => void
   onAddPlayer: () => void
   onRenamePlayer: (playerId: string, nextName: string) => Promise<boolean>
+  onSetPlayerTeamVisibility: (playerId: string, isHiddenFromTeams: boolean) => void
   onProtectedAction: (title: string, onAllowed: () => void | Promise<void>) => void
 }) {
   const [isSheetOpen, setIsSheetOpen] = useState(false)
@@ -1409,21 +1539,23 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
           </CardContent>
         </Card>
         <div className="hidden md:block">
-          <PlayerDetail key={selectedPlayer.id} player={selectedPlayer} onRenamePlayer={onRenamePlayer} onProtectedAction={onProtectedAction} />
+          <PlayerDetail key={selectedPlayer.id} player={selectedPlayer} onRenamePlayer={onRenamePlayer} onSetPlayerTeamVisibility={onSetPlayerTeamVisibility} onProtectedAction={onProtectedAction} />
         </div>
       </div>
-      <PlayerDetailSheet open={isSheetOpen} player={selectedPlayer} onClose={() => setIsSheetOpen(false)} onRenamePlayer={onRenamePlayer} onProtectedAction={onProtectedAction} />
+      <PlayerDetailSheet open={isSheetOpen} player={selectedPlayer} onClose={() => setIsSheetOpen(false)} onRenamePlayer={onRenamePlayer} onSetPlayerTeamVisibility={onSetPlayerTeamVisibility} onProtectedAction={onProtectedAction} />
     </section>
   )
 }
 
-function PlayerDetail({ player, onRenamePlayer, onProtectedAction }: {
+function PlayerDetail({ player, onRenamePlayer, onSetPlayerTeamVisibility, onProtectedAction }: {
   player: PlayerCard
   onRenamePlayer: (playerId: string, nextName: string) => Promise<boolean>
+  onSetPlayerTeamVisibility: (playerId: string, isHiddenFromTeams: boolean) => void
   onProtectedAction: (title: string, onAllowed: () => void | Promise<void>) => void
 }) {
   const [isEditingName, setIsEditingName] = useState(false)
   const [draftName, setDraftName] = useState(player.name)
+  const [isHideDialogOpen, setIsHideDialogOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -1452,9 +1584,23 @@ function PlayerDetail({ player, onRenamePlayer, onProtectedAction }: {
     setIsEditingName(false)
   }
 
+  const changeTeamVisibility = () => {
+    if (player.isHiddenFromTeams) {
+      onSetPlayerTeamVisibility(player.id, false)
+      return
+    }
+
+    setIsHideDialogOpen(true)
+  }
+
+  const hideFromTeamSelection = () => {
+    setIsHideDialogOpen(false)
+    onSetPlayerTeamVisibility(player.id, true)
+  }
+
   return (
     <Card size="sm" className="rounded-3xl shadow-sm">
-      <CardHeader>
+      <CardHeader className="grid-cols-[minmax(0,1fr)_auto]">
         <div className="flex min-w-0 items-center gap-3">
           <PlayerAvatar name={player.name} />
           {isEditingName ? (
@@ -1486,12 +1632,42 @@ function PlayerDetail({ player, onRenamePlayer, onProtectedAction }: {
           ) : (
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <CardTitle className="min-w-0 truncate">{player.name}</CardTitle>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label={`Edit nama ${player.name}`} onClick={startEditingName}>
-                <PencilIcon />
-              </Button>
+              {player.isHiddenFromTeams && <Badge variant="secondary">Disembunyikan</Badge>}
             </div>
           )}
         </div>
+        {!isEditingName && (
+          <CardAction>
+            <Menu.Root>
+              <Menu.Trigger
+                className="inline-flex size-8 items-center justify-center rounded-2xl outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/30 data-[popup-open]:bg-muted"
+                aria-label={`Kelola ${player.name}`}
+              >
+                <EllipsisVertical className="size-4" />
+              </Menu.Trigger>
+              <Menu.Portal>
+                <Menu.Positioner side="bottom" align="end" sideOffset={6} className="z-[70] outline-none">
+                  <Menu.Popup className="min-w-52 rounded-xl border bg-popover p-1 text-sm text-popover-foreground shadow-lg outline-none">
+                    <Menu.Item className="flex cursor-default items-center gap-2 rounded-lg px-3 py-2 outline-none data-[highlighted]:bg-muted" onClick={startEditingName}>
+                      <PencilIcon className="size-4" />
+                      Edit
+                    </Menu.Item>
+                    <Menu.Item
+                      className={cn(
+                        'flex cursor-default items-center gap-2 rounded-lg px-3 py-2 outline-none data-[highlighted]:bg-muted',
+                        !player.isHiddenFromTeams && 'text-destructive data-[highlighted]:bg-destructive/10'
+                      )}
+                      onClick={changeTeamVisibility}
+                    >
+                      {player.isHiddenFromTeams ? <EyeIcon className="size-4" /> : <EyeOff className="size-4" />}
+                      {player.isHiddenFromTeams ? 'Tampilkan' : 'Sembunyikan'}
+                    </Menu.Item>
+                  </Menu.Popup>
+                </Menu.Positioner>
+              </Menu.Portal>
+            </Menu.Root>
+          </CardAction>
+        )}
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="grid grid-cols-3 gap-2">
@@ -1513,15 +1689,37 @@ function PlayerDetail({ player, onRenamePlayer, onProtectedAction }: {
           ))}
         </div>
       </CardContent>
+      <AlertDialog.Root open={isHideDialogOpen} onOpenChange={setIsHideDialogOpen}>
+        <AlertDialog.Portal>
+          <AlertDialog.Backdrop className="fixed inset-0 z-[80] bg-background/70 backdrop-blur-sm" />
+          <AlertDialog.Viewport className="fixed inset-0 z-[80] grid place-items-center px-4">
+            <AlertDialog.Popup className="grid w-full max-w-sm gap-4 rounded-3xl border bg-card p-5 shadow-xl outline-none">
+              <div className="grid gap-1">
+                <AlertDialog.Title className="font-heading text-lg font-semibold">
+                  Sembunyikan {player.name}?
+                </AlertDialog.Title>
+                <AlertDialog.Description className="text-sm text-muted-foreground">
+                  Pemain tidak akan muncul di pilihan tim. Riwayat game tetap tersimpan.
+                </AlertDialog.Description>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <AlertDialog.Close render={<Button type="button" variant="outline" />}>Batal</AlertDialog.Close>
+                <Button type="button" variant="destructive" onClick={hideFromTeamSelection}>Sembunyikan</Button>
+              </div>
+            </AlertDialog.Popup>
+          </AlertDialog.Viewport>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
     </Card>
   )
 }
 
-function PlayerDetailSheet({ open, player, onClose, onRenamePlayer, onProtectedAction }: {
+function PlayerDetailSheet({ open, player, onClose, onRenamePlayer, onSetPlayerTeamVisibility, onProtectedAction }: {
   open: boolean
   player: PlayerCard
   onClose: () => void
   onRenamePlayer: (playerId: string, nextName: string) => Promise<boolean>
+  onSetPlayerTeamVisibility: (playerId: string, isHiddenFromTeams: boolean) => void
   onProtectedAction: (title: string, onAllowed: () => void | Promise<void>) => void
 }) {
   useEffect(() => {
@@ -1540,13 +1738,13 @@ function PlayerDetailSheet({ open, player, onClose, onRenamePlayer, onProtectedA
   return (
     <div className={cn('fixed inset-0 z-50 md:hidden', open ? 'pointer-events-auto' : 'pointer-events-none')} aria-hidden={!open}>
       <div
-        className={cn('absolute inset-0 bg-background/70 backdrop-blur-sm transition-opacity duration-300', open ? 'opacity-100' : 'opacity-0')}
+        className={cn('sheet-backdrop absolute inset-0 bg-background/70 backdrop-blur-sm', open ? 'opacity-100' : 'opacity-0')}
         onClick={onClose}
       />
       <div
         className={cn(
-          'absolute bottom-0 left-0 right-0 flex max-h-[85dvh] flex-col rounded-t-3xl border bg-card shadow-xl transition-transform duration-300 ease-out',
-          open ? 'translate-y-0' : 'translate-y-full'
+          'player-sheet absolute bottom-0 left-0 right-0 flex max-h-[85dvh] flex-col rounded-t-3xl border bg-card shadow-xl',
+          open && 'is-open'
         )}
         role="dialog"
         aria-modal="true"
@@ -1558,10 +1756,10 @@ function PlayerDetailSheet({ open, player, onClose, onRenamePlayer, onProtectedA
           aria-label="Tutup detail"
           onClick={onClose}
         >
-          <div className="h-1.5 w-12 rounded-full bg-muted" />
+          <div className="sheet-handle h-1.5 w-12 rounded-full bg-muted" />
         </button>
         <div className="overflow-y-auto p-4">
-          <PlayerDetail key={player.id} player={player} onRenamePlayer={onRenamePlayer} onProtectedAction={onProtectedAction} />
+          <PlayerDetail key={player.id} player={player} onRenamePlayer={onRenamePlayer} onSetPlayerTeamVisibility={onSetPlayerTeamVisibility} onProtectedAction={onProtectedAction} />
         </div>
       </div>
     </div>

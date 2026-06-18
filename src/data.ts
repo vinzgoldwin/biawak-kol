@@ -22,6 +22,7 @@ export type HistoryGame = {
 export type PlayerCard = {
   id: string
   name: string
+  isHiddenFromTeams: boolean
   active: boolean
   games: number
   wins: number
@@ -38,6 +39,7 @@ export type PlayerCard = {
 export type RosterPlayer = {
   id: string
   name: string
+  isHiddenFromTeams?: boolean
   seedStats?: {
     games: number
     wins: number
@@ -52,6 +54,8 @@ export const navItems: Array<{ id: NavKey; label: string; icon: string }> = [
   { id: 'history', label: 'Riwayat', icon: '◫' },
   { id: 'players', label: 'Pemain', icon: '◌' },
 ]
+
+export const seedStatsMonth = '2026-06'
 
 export const playerDirectory: RosterPlayer[] = [
   { id: 'kevin', name: 'Kevin', seedStats: { games: 9, wins: 7, losses: 2, points: 19 } },

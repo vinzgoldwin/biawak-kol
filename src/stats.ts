@@ -16,6 +16,7 @@ export type LeaderboardData = {
 type MutablePlayerStats = {
   id: string
   name: string
+  isHiddenFromTeams: boolean
   games: number
   wins: number
   losses: number
@@ -39,13 +40,14 @@ const getCoefficientValue = (coefficient: string) => (
     : Number(coefficient)
 )
 
-const createEmptyStats = (player: RosterPlayer, sourceIndex: number): MutablePlayerStats => ({
+const createEmptyStats = (player: RosterPlayer, sourceIndex: number, includeSeedStats = true): MutablePlayerStats => ({
   id: player.id,
   name: player.name,
-  games: player.seedStats?.games ?? 0,
-  wins: player.seedStats?.wins ?? 0,
-  losses: player.seedStats?.losses ?? 0,
-  points: player.seedStats?.points ?? 0,
+  isHiddenFromTeams: player.isHiddenFromTeams === true,
+  games: includeSeedStats ? player.seedStats?.games ?? 0 : 0,
+  wins: includeSeedStats ? player.seedStats?.wins ?? 0 : 0,
+  losses: includeSeedStats ? player.seedStats?.losses ?? 0 : 0,
+  points: includeSeedStats ? player.seedStats?.points ?? 0 : 0,
   recentGames: [],
   sourceIndex,
 })
@@ -62,6 +64,7 @@ const ensurePlayerStats = (statsByName: Map<string, MutablePlayerStats>, playerN
 const toPlayerCard = (player: MutablePlayerStats): PlayerCard => ({
   id: player.id,
   name: player.name,
+  isHiddenFromTeams: player.isHiddenFromTeams,
   active: player.games > 0,
   games: player.games,
   wins: player.wins,
@@ -95,11 +98,16 @@ const sortByBestWinRate = (left: PlayerCard, right: PlayerCard) => (
   || compareLeaderboardPlayers(left, right)
 )
 
-export function buildPlayerStats(rosterPlayers: RosterPlayer[], games: HistoryGame[]): PlayerCard[] {
+export function buildPlayerStats(
+  rosterPlayers: RosterPlayer[],
+  games: HistoryGame[],
+  options: { includeSeedStats?: boolean } = {},
+): PlayerCard[] {
   const statsByName = new Map<string, MutablePlayerStats>()
+  const includeSeedStats = options.includeSeedStats ?? true
 
   rosterPlayers.forEach((player, index) => {
-    statsByName.set(player.name, createEmptyStats(player, index))
+    statsByName.set(player.name, createEmptyStats(player, index, includeSeedStats))
   })
 
   const sortedGames = [...games].sort((left, right) => right.id - left.id)

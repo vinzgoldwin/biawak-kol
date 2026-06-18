@@ -52,7 +52,11 @@ function isHistoryGame(value: unknown): value is HistoryGame {
 function isRosterPlayer(value: unknown): value is RosterPlayer {
   if (!isRecord(value)) return false
 
-  return typeof value.id === 'string' && typeof value.name === 'string'
+  return (
+    typeof value.id === 'string'
+    && typeof value.name === 'string'
+    && (value.isHiddenFromTeams === undefined || typeof value.isHiddenFromTeams === 'boolean')
+  )
 }
 
 export function isSharedState(value: unknown): value is SharedState {
