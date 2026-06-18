@@ -44,12 +44,17 @@ import { fetchSharedState, saveSharedState, SharedStateError, type SharedState }
 import { buildDashboardSummary, buildLeaderboard, buildPlayerStats, type SummaryStat } from './stats'
 
 type Winner = 'A' | 'B'
+type PlayerSort = 'alphabetical' | 'matches'
 
 const TEAM_SIZE = 5
 const HISTORY_STORAGE_KEY = 'biawak-kol.historyGames'
 const ROSTER_STORAGE_KEY = 'biawak-kol.rosterPlayers'
 const PROTECTED_PASSWORD_STORAGE_KEY = 'biawak-kol.protectedPassword'
 const ACTIVE_SCREEN_STORAGE_KEY = 'biawak-kol.activeScreen'
+const PLAYER_SORT_OPTIONS: Array<{ value: PlayerSort; label: string }> = [
+  { value: 'alphabetical', label: 'A-Z' },
+  { value: 'matches', label: 'Match' },
+]
 
 type RecordState = {
   dateValue: string
@@ -486,6 +491,11 @@ function App() {
       .filter((player) => !assignedPlayers.has(player) && (query === '' || player.toLowerCase().includes(query)))
   }, [assignedPlayers, recordState.search, rosterPlayers])
 
+  const playerMatchCounts = useMemo(
+    () => new Map(computedPlayers.map((player) => [player.name, player.games])),
+    [computedPlayers],
+  )
+
   const filteredPlayers = useMemo(() => {
     const query = playerQuery.trim().toLowerCase()
     return computedPlayers.filter((player) => query === '' || player.name.toLowerCase().includes(query))
@@ -778,6 +788,7 @@ function App() {
             <RecordScreen
               recordState={recordState}
               availablePlayers={availablePlayers}
+              playerMatchCounts={playerMatchCounts}
               editingGameId={editingGameId}
               teamsFull={teamsFull}
               canSave={canSave && !isSyncing}
@@ -1164,7 +1175,7 @@ function LeaderboardTable({ rows, ranked = false, animationKey }: { rows: Leader
                 </TableCell>
               )}
               <TableCell>
-                <span className="flex items-center gap-2 font-medium"><PlayerAvatar name={player.name} />{player.name}</span>
+                <span className="flex items-center gap-2 font-medium"><PlayerAvatar name={player.name} seed={index} />{player.name}</span>
               </TableCell>
               <TableCell>{player.games}</TableCell>
               <TableCell>{player.wins}</TableCell>
@@ -1180,9 +1191,10 @@ function LeaderboardTable({ rows, ranked = false, animationKey }: { rows: Leader
   )
 }
 
-function RecordScreen({ recordState, availablePlayers, editingGameId, teamsFull, canSave, onSearchChange, onDateChange, onAddPlayer, onRemovePlayer, onSwapTeams, onWinnerChange, onSave }: {
+function RecordScreen({ recordState, availablePlayers, playerMatchCounts, editingGameId, teamsFull, canSave, onSearchChange, onDateChange, onAddPlayer, onRemovePlayer, onSwapTeams, onWinnerChange, onSave }: {
   recordState: RecordState
   availablePlayers: string[]
+  playerMatchCounts: ReadonlyMap<string, number>
   editingGameId: number | null
   teamsFull: boolean
   canSave: boolean
@@ -1195,8 +1207,18 @@ function RecordScreen({ recordState, availablePlayers, editingGameId, teamsFull,
   onSave: () => void
 }) {
   const [teamPickerPlayer, setTeamPickerPlayer] = useState<string | null>(null)
+  const [playerSort, setPlayerSort] = useState<PlayerSort>('alphabetical')
   const teamAFull = recordState.teamA.length >= TEAM_SIZE
   const teamBFull = recordState.teamB.length >= TEAM_SIZE
+  const sortedAvailablePlayers = useMemo(() => {
+    return [...availablePlayers].sort((first, second) => {
+      const alphabeticalOrder = first.localeCompare(second, 'id', { sensitivity: 'base' })
+      if (playerSort === 'alphabetical') return alphabeticalOrder
+
+      const matchDifference = (playerMatchCounts.get(second) ?? 0) - (playerMatchCounts.get(first) ?? 0)
+      return matchDifference || alphabeticalOrder
+    })
+  }, [availablePlayers, playerMatchCounts, playerSort])
 
   const addPlayerAndClosePicker = (playerName: string, team: Winner) => {
     onAddPlayer(playerName, team)
@@ -1221,10 +1243,27 @@ function RecordScreen({ recordState, availablePlayers, editingGameId, teamsFull,
       <section className="grid gap-2">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-sm font-semibold">Pemain Tersedia</h2>
-          <span className="text-xs text-muted-foreground">tap pemain, lalu pilih tim</span>
+          <Select
+            value={playerSort}
+            onValueChange={(value) => {
+              if (value === 'alphabetical' || value === 'matches') setPlayerSort(value)
+            }}
+            items={PLAYER_SORT_OPTIONS}
+          >
+            <SelectTrigger size="sm" className="w-24 border-border bg-background" aria-label="Urutkan pemain">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end" alignItemWithTrigger={false}>
+              <SelectGroup>
+                {PLAYER_SORT_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-          {availablePlayers.map((player, index) => (
+          {sortedAvailablePlayers.map((player) => (
             teamPickerPlayer === player ? (
               <div key={player} className="flex h-11 min-w-0 overflow-hidden rounded-full border bg-background shadow-sm" aria-label={`Pilih tim untuk ${player}`}>
                 <Button
@@ -1255,7 +1294,7 @@ function RecordScreen({ recordState, availablePlayers, editingGameId, teamsFull,
                 aria-label={`Pilih ${player}`}
                 onClick={() => setTeamPickerPlayer(player)}
               >
-                <PlayerAvatar name={player} seed={index} />
+                <PlayerAvatar name={player} />
                 <strong className="min-w-0 flex-1 truncate text-left text-sm font-medium">{player}</strong>
               </Button>
             )
@@ -1292,11 +1331,9 @@ function RecordScreen({ recordState, availablePlayers, editingGameId, teamsFull,
         <TeamBox title="Tim B" tone="yellow" players={recordState.teamB} teamSize={TEAM_SIZE} onRemove={(name) => onRemovePlayer(name, 'B')} />
       </div>
 
-      <Card size="sm" className="rounded-3xl shadow-sm">
-        <CardHeader>
-          <CardTitle>Pemenang</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3">
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold">Pemenang</h3>
+        <div className="grid grid-cols-2 gap-3">
           <Button type="button" variant={recordState.winner === 'A' ? 'default' : 'outline'} className="h-12" onClick={() => onWinnerChange('A')}>
             <TrophyIcon data-icon="inline-start" />
             Tim A
@@ -1310,8 +1347,8 @@ function RecordScreen({ recordState, availablePlayers, editingGameId, teamsFull,
             <TrophyIcon data-icon="inline-start" />
             Tim B
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <p className={teamsFull ? 'text-sm font-medium text-primary' : 'text-sm font-medium text-destructive'}>{teamsFull ? 'Pemain lengkap. Siap disimpan!' : 'Pemain belum lengkap.'}</p>
       <Button type="button" className="h-11 w-full" disabled={!canSave} onClick={onSave}>
@@ -1428,7 +1465,7 @@ function HistoryScreen({ games, monthOptions, selectedMonth, onMonthChange, onEd
 
   return (
     <section className="grid gap-4 md:max-w-3xl">
-      <div className="grid gap-2 md:grid-cols-[12rem_1fr] md:items-center">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:grid-cols-[12rem_1fr]">
         <Select value={selectedMonth} onValueChange={(value) => value && onMonthChange(value)} items={monthOptions}>
           <SelectTrigger className="h-11 w-full bg-card font-medium">
             <SelectValue placeholder="Pilih bulan" />
@@ -1441,7 +1478,7 @@ function HistoryScreen({ games, monthOptions, selectedMonth, onMonthChange, onEd
             </SelectGroup>
           </SelectContent>
         </Select>
-        <p className="px-1 text-xs font-medium text-muted-foreground">
+        <p className="whitespace-nowrap px-1 text-right text-xs font-medium text-muted-foreground md:text-left">
           {games.length} game di {formatMonthLabel(selectedMonth)}
         </p>
       </div>
@@ -1819,12 +1856,13 @@ function ScoreMetric({ label, value, tone }: { label: string; value: string | nu
   )
 }
 
-function PlayerAvatar({ name, seed = 0 }: { name: string; seed?: number }) {
+function PlayerAvatar({ name, seed }: { name: string; seed?: number }) {
   const initials = name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
   const tones = ['bg-primary text-primary-foreground', 'bg-chart-3 text-white', 'bg-chart-4 text-white', 'bg-chart-5 text-white', 'bg-foreground text-background']
+  const toneSeed = seed ?? Array.from(name).reduce((total, character) => total + character.charCodeAt(0), 0)
 
   return (
-    <ShadAvatar size="sm" className={tones[seed % tones.length]}>
+    <ShadAvatar size="sm" className={tones[toneSeed % tones.length]}>
       <AvatarFallback className="bg-transparent text-[10px] font-semibold text-current">{initials}</AvatarFallback>
     </ShadAvatar>
   )
