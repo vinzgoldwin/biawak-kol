@@ -1,13 +1,12 @@
 import type { HistoryGame, LeaderboardRow, PlayerCard, RosterPlayer } from './data'
 
-const MINIMUM_QUALIFIED_GAMES = 5
-
 export type SummaryStat = {
   label: string
   value: string
 }
 
 export type LeaderboardData = {
+  minimumGames: number
   all: LeaderboardRow[]
   qualified: LeaderboardRow[]
   unqualified: LeaderboardRow[]
@@ -75,8 +74,9 @@ const toPlayerCard = (player: MutablePlayerStats): PlayerCard => ({
   recentGames: player.recentGames,
 })
 
-const toLeaderboardRow = (player: PlayerCard): LeaderboardRow => ({
+const toLeaderboardRow = (player: PlayerCard, isQualified: boolean): LeaderboardRow => ({
   name: player.name,
+  isQualified,
   games: player.games,
   wins: player.wins,
   losses: player.losses,
@@ -97,6 +97,10 @@ const sortByBestWinRate = (left: PlayerCard, right: PlayerCard) => (
   getWinRateValue(right) - getWinRateValue(left)
   || compareLeaderboardPlayers(left, right)
 )
+
+export function getMinimumQualifiedGames(players: Pick<PlayerCard, 'games'>[]) {
+  return Math.ceil(Math.max(0, ...players.map((player) => player.games)) / 2)
+}
 
 export function buildPlayerStats(
   rosterPlayers: RosterPlayer[],
@@ -152,15 +156,18 @@ export function buildLeaderboard(players: PlayerCard[]): LeaderboardData {
   const rankedPlayers = players
     .filter((player) => player.games > 0)
     .sort(compareLeaderboardPlayers)
+  const minimumGames = getMinimumQualifiedGames(rankedPlayers)
+  const qualifiedPlayers = rankedPlayers.filter((player) => player.games >= minimumGames)
+  const unqualifiedPlayers = rankedPlayers.filter((player) => player.games < minimumGames)
 
   return {
-    all: rankedPlayers.map(toLeaderboardRow),
-    qualified: rankedPlayers
-      .filter((player) => player.games >= MINIMUM_QUALIFIED_GAMES)
-      .map(toLeaderboardRow),
-    unqualified: rankedPlayers
-      .filter((player) => player.games < MINIMUM_QUALIFIED_GAMES)
-      .map(toLeaderboardRow),
+    minimumGames,
+    all: [
+      ...qualifiedPlayers.map((player) => toLeaderboardRow(player, true)),
+      ...unqualifiedPlayers.map((player) => toLeaderboardRow(player, false)),
+    ],
+    qualified: qualifiedPlayers.map((player) => toLeaderboardRow(player, true)),
+    unqualified: unqualifiedPlayers.map((player) => toLeaderboardRow(player, false)),
   }
 }
 
@@ -168,13 +175,13 @@ export function buildDashboardSummary(games: HistoryGame[], players: PlayerCard[
   const activePlayers = players.filter((player) => player.games > 0)
   const topPlayer = leaderboard.qualified[0] ?? leaderboard.unqualified[0]
   const bestWinRatePlayer = [...activePlayers]
-    .filter((player) => leaderboard.qualified.length === 0 || player.games >= MINIMUM_QUALIFIED_GAMES)
+    .filter((player) => leaderboard.qualified.length === 0 || player.games >= leaderboard.minimumGames)
     .sort(sortByBestWinRate)[0]
 
   return [
     { label: 'Total Game', value: String(games.length) },
     { label: 'Pemain', value: String(activePlayers.length) },
     { label: 'Pemain Teratas', value: topPlayer?.name ?? '-' },
-    { label: 'Persen Menang Terbaik (≥5 Game)', value: bestWinRatePlayer?.winRate ?? '-' },
+    { label: `Persen Menang Terbaik (≥${leaderboard.minimumGames} Game)`, value: bestWinRatePlayer?.winRate ?? '-' },
   ]
 }

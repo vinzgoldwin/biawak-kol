@@ -42,7 +42,7 @@ import {
   type IconComponent,
 } from './icons'
 import { fetchSharedState, saveSharedState, SharedStateError, type SharedState } from './remote-state'
-import { buildDashboardSummary, buildLeaderboard, buildPlayerStats, type SummaryStat } from './stats'
+import { buildDashboardSummary, buildLeaderboard, buildPlayerStats, getMinimumQualifiedGames, type SummaryStat } from './stats'
 
 type Winner = 'A' | 'B'
 type PlayerSort = 'alphabetical' | 'matches'
@@ -1070,9 +1070,20 @@ function compareExportPlayers(left: PlayerCard, right: PlayerCard) {
 const EXPORT_MAX_ROWS = 50
 
 function buildExportRows(players: PlayerCard[]) {
-  const active = players.filter((player) => player.games > 0).sort(compareExportPlayers)
-  const inactive = players.filter((player) => player.games === 0).sort((left, right) => left.name.localeCompare(right.name))
-  return [...active, ...inactive].slice(0, EXPORT_MAX_ROWS)
+  const minimumGames = getMinimumQualifiedGames(players)
+  const qualified = players
+    .filter((player) => player.games >= minimumGames && player.games > 0)
+    .sort(compareExportPlayers)
+  const unqualified = players
+    .filter((player) => player.games < minimumGames)
+    .sort((left, right) => {
+      if (left.games === 0 && right.games > 0) return 1
+      if (right.games === 0 && left.games > 0) return -1
+      if (left.games === 0 && right.games === 0) return left.name.localeCompare(right.name)
+      return compareExportPlayers(left, right)
+    })
+
+  return [...qualified, ...unqualified].slice(0, EXPORT_MAX_ROWS)
 }
 
 function LeaderboardImageExport({ players, selectedMonth, exportRef }: {
@@ -1081,6 +1092,7 @@ function LeaderboardImageExport({ players, selectedMonth, exportRef }: {
   exportRef: RefObject<HTMLDivElement | null>
 }) {
   const exportRows = useMemo(() => buildExportRows(players), [players])
+  const minimumGames = getMinimumQualifiedGames(players)
   const title = `KLASEMEN ${formatMonthLabel(selectedMonth).toUpperCase()} BIAWAK KOL GAMES`
 
   return (
@@ -1120,10 +1132,11 @@ function LeaderboardImageExport({ players, selectedMonth, exportRef }: {
           <tbody>
             {exportRows.map((player, index) => {
               const isInactive = player.games === 0
+              const isQualified = player.games >= minimumGames && player.games > 0
               const emptyValue = isInactive ? '-' : null
 
               return (
-                <tr key={player.id} className="bg-transparent text-black">
+                <tr key={player.id} className={isQualified ? 'bg-transparent text-black' : 'bg-[#f8d7da] text-[#7f1d1d]'}>
                   <td className="border border-black px-1 py-1 text-right">{index + 1}</td>
                   <td className="border border-black px-2 py-1 text-left uppercase">{player.name}</td>
                   <td className="border border-black px-1 py-1 text-right">{emptyValue ?? player.games}</td>
@@ -1166,14 +1179,22 @@ function LeaderboardTable({ rows, ranked = false, animationKey }: { rows: Leader
             : player.name
           const rankClassName = cn(
             'inline-grid h-7 min-w-7 place-items-center px-1.5 text-[11px] font-semibold tabular-nums',
-            rank === 1 && 'text-yellow-700',
-            rank === 2 && 'text-zinc-500',
-            rank === 3 && 'text-orange-700',
-            rank > 3 && 'text-foreground',
+            !player.isQualified && 'text-red-900',
+            player.isQualified && rank === 1 && 'text-yellow-700',
+            player.isQualified && rank === 2 && 'text-zinc-500',
+            player.isQualified && rank === 3 && 'text-orange-700',
+            player.isQualified && rank > 3 && 'text-foreground',
           )
 
           return (
-            <TableRow key={player.name} className="leaderboard-row" style={{ '--row-index': index } as CSSProperties}>
+            <TableRow
+              key={player.name}
+              className={cn(
+                'leaderboard-row',
+                !player.isQualified && 'bg-red-50 text-red-900 hover:bg-red-100',
+              )}
+              style={{ '--row-index': index } as CSSProperties}
+            >
               {ranked && (
                 <TableCell className="font-medium">
                   <span className={rankClassName}>{rank}</span>
@@ -1191,7 +1212,11 @@ function LeaderboardTable({ rows, ranked = false, animationKey }: { rows: Leader
               <TableCell>{player.losses}</TableCell>
               <TableCell className="font-semibold">{player.points}</TableCell>
               <TableCell>{player.coefficient}</TableCell>
-              <TableCell><Badge variant="secondary">{player.winRate}</Badge></TableCell>
+              <TableCell>
+                <Badge variant="secondary" className={cn(!player.isQualified && 'bg-red-100 text-red-900')}>
+                  {player.winRate}
+                </Badge>
+              </TableCell>
             </TableRow>
           )
         })}

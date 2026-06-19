@@ -2,6 +2,7 @@ export type NavKey = 'dashboard' | 'record' | 'saved' | 'history' | 'players'
 
 export type LeaderboardRow = {
   name: string
+  isQualified: boolean
   games: number
   wins: number
   losses: number
