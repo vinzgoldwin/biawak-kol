@@ -16,6 +16,7 @@ type MutablePlayerStats = {
   id: string
   name: string
   isHiddenFromTeams: boolean
+  isExcludedFromLeaderboard: boolean
   games: number
   wins: number
   losses: number
@@ -43,6 +44,7 @@ const createEmptyStats = (player: RosterPlayer, sourceIndex: number, includeSeed
   id: player.id,
   name: player.name,
   isHiddenFromTeams: player.isHiddenFromTeams === true,
+  isExcludedFromLeaderboard: player.isExcludedFromLeaderboard === true,
   games: includeSeedStats ? player.seedStats?.games ?? 0 : 0,
   wins: includeSeedStats ? player.seedStats?.wins ?? 0 : 0,
   losses: includeSeedStats ? player.seedStats?.losses ?? 0 : 0,
@@ -64,6 +66,7 @@ const toPlayerCard = (player: MutablePlayerStats): PlayerCard => ({
   id: player.id,
   name: player.name,
   isHiddenFromTeams: player.isHiddenFromTeams,
+  isExcludedFromLeaderboard: player.isExcludedFromLeaderboard,
   active: player.games > 0,
   games: player.games,
   wins: player.wins,
@@ -154,7 +157,7 @@ export function buildPlayerStats(
 
 export function buildLeaderboard(players: PlayerCard[]): LeaderboardData {
   const rankedPlayers = players
-    .filter((player) => player.games > 0)
+    .filter((player) => !player.isExcludedFromLeaderboard && player.games > 0)
     .sort(compareLeaderboardPlayers)
   const minimumGames = getMinimumQualifiedGames(rankedPlayers)
   const qualifiedPlayers = rankedPlayers.filter((player) => player.games >= minimumGames)
@@ -172,7 +175,7 @@ export function buildLeaderboard(players: PlayerCard[]): LeaderboardData {
 }
 
 export function buildDashboardSummary(games: HistoryGame[], players: PlayerCard[], leaderboard: LeaderboardData): SummaryStat[] {
-  const activePlayers = players.filter((player) => player.games > 0)
+  const activePlayers = players.filter((player) => !player.isExcludedFromLeaderboard && player.games > 0)
   const topPlayer = leaderboard.qualified[0] ?? leaderboard.unqualified[0]
   const bestWinRatePlayer = [...activePlayers]
     .filter((player) => leaderboard.qualified.length === 0 || player.games >= leaderboard.minimumGames)

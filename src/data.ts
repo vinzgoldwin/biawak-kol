@@ -24,6 +24,7 @@ export type PlayerCard = {
   id: string
   name: string
   isHiddenFromTeams: boolean
+  isExcludedFromLeaderboard: boolean
   active: boolean
   games: number
   wins: number
@@ -41,6 +42,8 @@ export type RosterPlayer = {
   id: string
   name: string
   isHiddenFromTeams?: boolean
+  isRepeatable?: boolean
+  isExcludedFromLeaderboard?: boolean
   seedStats?: {
     games: number
     wins: number
@@ -59,6 +62,7 @@ export const navItems: Array<{ id: NavKey; label: string; icon: string }> = [
 export const seedStatsMonth = '2026-06'
 
 export const playerDirectory: RosterPlayer[] = [
+  { id: 'anonim', name: 'Anonim', isRepeatable: true, isExcludedFromLeaderboard: true },
   { id: 'kevin', name: 'Kevin', seedStats: { games: 12, wins: 9, losses: 3, points: 24 } },
   { id: 'ko-giri', name: 'Ko Giri', seedStats: { games: 10, wins: 8, losses: 2, points: 22 } },
   { id: 'ko-anton', name: 'Ko Anton', seedStats: { games: 10, wins: 7, losses: 3, points: 18 } },
@@ -123,6 +127,8 @@ export function reconcileRosterSeed(rosterPlayers: RosterPlayer[]) {
     return {
       ...storedPlayer,
       name: storedPlayer.name === legacySeedNames[seededPlayer.id] ? seededPlayer.name : storedPlayer.name,
+      isRepeatable: seededPlayer.isRepeatable,
+      isExcludedFromLeaderboard: seededPlayer.isExcludedFromLeaderboard,
       seedStats: seededPlayer.seedStats,
     }
   })

@@ -15,6 +15,8 @@ type RosterPlayer = {
   id: string
   name: string
   isHiddenFromTeams?: boolean
+  isRepeatable?: boolean
+  isExcludedFromLeaderboard?: boolean
   seedStats?: {
     games: number
     wins: number
@@ -84,6 +86,8 @@ function isRosterPlayer(value: unknown): value is RosterPlayer {
     typeof value.id === 'string'
     && typeof value.name === 'string'
     && (value.isHiddenFromTeams === undefined || typeof value.isHiddenFromTeams === 'boolean')
+    && (value.isRepeatable === undefined || typeof value.isRepeatable === 'boolean')
+    && (value.isExcludedFromLeaderboard === undefined || typeof value.isExcludedFromLeaderboard === 'boolean')
     && (value.seedStats === undefined || isSeedStats(value.seedStats))
   )
 }

@@ -246,6 +246,8 @@ function isRosterPlayer(value: unknown): value is RosterPlayer {
     typeof value.id === 'string'
     && typeof value.name === 'string'
     && (value.isHiddenFromTeams === undefined || typeof value.isHiddenFromTeams === 'boolean')
+    && (value.isRepeatable === undefined || typeof value.isRepeatable === 'boolean')
+    && (value.isExcludedFromLeaderboard === undefined || typeof value.isExcludedFromLeaderboard === 'boolean')
   )
 }
 
@@ -490,13 +492,18 @@ function App() {
     const query = recordState.search.trim().toLowerCase()
     return rosterPlayers
       .filter((player) => player.isHiddenFromTeams !== true)
+      .filter((player) => player.isRepeatable === true || !assignedPlayers.has(player.name))
       .map((player) => player.name)
-      .filter((player) => !assignedPlayers.has(player) && (query === '' || player.toLowerCase().includes(query)))
+      .filter((player) => query === '' || player.toLowerCase().includes(query))
   }, [assignedPlayers, recordState.search, rosterPlayers])
 
   const playerMatchCounts = useMemo(
     () => new Map(computedPlayers.map((player) => [player.name, player.games])),
     [computedPlayers],
+  )
+  const reservePlayerNames = useMemo(
+    () => new Set(rosterPlayers.filter((player) => player.isExcludedFromLeaderboard).map((player) => player.name)),
+    [rosterPlayers],
   )
 
   const filteredPlayers = useMemo(() => {
@@ -552,15 +559,16 @@ function App() {
       const targetKey = team === 'A' ? 'teamA' : 'teamB'
       const targetTeam = current[targetKey]
       if (targetTeam.length >= TEAM_SIZE) return current
-      if (current.teamA.includes(playerName) || current.teamB.includes(playerName)) return current
+      const isRepeatable = rosterPlayers.some((player) => player.name === playerName && player.isRepeatable === true)
+      if (!isRepeatable && (current.teamA.includes(playerName) || current.teamB.includes(playerName))) return current
       return { ...current, [targetKey]: [...targetTeam, playerName] }
     })
   }
 
-  const removePlayerFromTeam = (playerName: string, team: Winner) => {
+  const removePlayerFromTeam = (playerIndex: number, team: Winner) => {
     setRecordState((current) => {
       const targetKey = team === 'A' ? 'teamA' : 'teamB'
-      return { ...current, [targetKey]: current[targetKey].filter((name) => name !== playerName) }
+      return { ...current, [targetKey]: current[targetKey].filter((_, index) => index !== playerIndex) }
     })
   }
 
@@ -790,6 +798,7 @@ function App() {
               recordState={recordState}
               availablePlayers={availablePlayers}
               playerMatchCounts={playerMatchCounts}
+              reservePlayerNames={reservePlayerNames}
               editingGameId={editingGameId}
               teamsFull={teamsFull}
               canSave={canSave && !isSyncing}
@@ -1070,12 +1079,12 @@ function compareExportPlayers(left: PlayerCard, right: PlayerCard) {
 const EXPORT_MAX_ROWS = 50
 
 function buildExportRows(players: PlayerCard[]) {
-  const minimumGames = getMinimumQualifiedGames(players)
+  const minimumGames = getMinimumQualifiedGames(players.filter((player) => !player.isExcludedFromLeaderboard))
   const qualified = players
-    .filter((player) => player.games >= minimumGames && player.games > 0)
+    .filter((player) => !player.isExcludedFromLeaderboard && player.games >= minimumGames && player.games > 0)
     .sort(compareExportPlayers)
   const unqualified = players
-    .filter((player) => player.games < minimumGames)
+    .filter((player) => !player.isExcludedFromLeaderboard && player.games < minimumGames)
     .sort((left, right) => {
       if (left.games === 0 && right.games > 0) return 1
       if (right.games === 0 && left.games > 0) return -1
@@ -1092,7 +1101,7 @@ function LeaderboardImageExport({ players, selectedMonth, exportRef }: {
   exportRef: RefObject<HTMLDivElement | null>
 }) {
   const exportRows = useMemo(() => buildExportRows(players), [players])
-  const minimumGames = getMinimumQualifiedGames(players)
+  const minimumGames = getMinimumQualifiedGames(players.filter((player) => !player.isExcludedFromLeaderboard))
   const title = `KLASEMEN ${formatMonthLabel(selectedMonth).toUpperCase()} BIAWAK KOL GAMES`
 
   return (
@@ -1225,17 +1234,18 @@ function LeaderboardTable({ rows, ranked = false, animationKey }: { rows: Leader
   )
 }
 
-function RecordScreen({ recordState, availablePlayers, playerMatchCounts, editingGameId, teamsFull, canSave, onSearchChange, onDateChange, onAddPlayer, onRemovePlayer, onSwapTeams, onWinnerChange, onSave }: {
+function RecordScreen({ recordState, availablePlayers, playerMatchCounts, reservePlayerNames, editingGameId, teamsFull, canSave, onSearchChange, onDateChange, onAddPlayer, onRemovePlayer, onSwapTeams, onWinnerChange, onSave }: {
   recordState: RecordState
   availablePlayers: string[]
   playerMatchCounts: ReadonlyMap<string, number>
+  reservePlayerNames: ReadonlySet<string>
   editingGameId: number | null
   teamsFull: boolean
   canSave: boolean
   onSearchChange: (value: string) => void
   onDateChange: (value: string) => void
   onAddPlayer: (playerName: string, team: Winner) => void
-  onRemovePlayer: (playerName: string, team: Winner) => void
+  onRemovePlayer: (playerIndex: number, team: Winner) => void
   onSwapTeams: () => void
   onWinnerChange: (winner: Winner) => void
   onSave: () => void
@@ -1246,13 +1256,16 @@ function RecordScreen({ recordState, availablePlayers, playerMatchCounts, editin
   const teamBFull = recordState.teamB.length >= TEAM_SIZE
   const sortedAvailablePlayers = useMemo(() => {
     return [...availablePlayers].sort((first, second) => {
+      const reserveOrder = Number(reservePlayerNames.has(second)) - Number(reservePlayerNames.has(first))
+      if (reserveOrder !== 0) return reserveOrder
+
       const alphabeticalOrder = first.localeCompare(second, 'id', { sensitivity: 'base' })
       if (playerSort === 'alphabetical') return alphabeticalOrder
 
       const matchDifference = (playerMatchCounts.get(second) ?? 0) - (playerMatchCounts.get(first) ?? 0)
       return matchDifference || alphabeticalOrder
     })
-  }, [availablePlayers, playerMatchCounts, playerSort])
+  }, [availablePlayers, playerMatchCounts, playerSort, reservePlayerNames])
 
   const addPlayerAndClosePicker = (playerName: string, team: Winner) => {
     onAddPlayer(playerName, team)
@@ -1324,11 +1337,14 @@ function RecordScreen({ recordState, availablePlayers, playerMatchCounts, editin
                 key={player}
                 type="button"
                 variant="outline"
-                className="h-11 w-full min-w-0 justify-start gap-2 rounded-full px-2 shadow-sm"
+                className={cn(
+                  'h-11 w-full min-w-0 justify-start gap-2 rounded-full px-2 shadow-sm',
+                  reservePlayerNames.has(player) && 'border-dashed bg-muted/60 text-muted-foreground shadow-none hover:bg-muted',
+                )}
                 aria-label={`Pilih ${player}`}
                 onClick={() => setTeamPickerPlayer(player)}
               >
-                <PlayerAvatar name={player} />
+                <PlayerAvatar name={player} isReserve={reservePlayerNames.has(player)} />
                 <strong className="min-w-0 flex-1 truncate text-left text-sm font-medium">{player}</strong>
               </Button>
             )
@@ -1342,7 +1358,7 @@ function RecordScreen({ recordState, availablePlayers, playerMatchCounts, editin
       </section>
 
       <div className="grid gap-4 py-2 sm:grid-cols-[1fr_auto_1fr] sm:gap-5">
-        <TeamBox title="Tim A" tone="blue" players={recordState.teamA} teamSize={TEAM_SIZE} onRemove={(name) => onRemovePlayer(name, 'A')} />
+        <TeamBox title="Tim A" tone="blue" players={recordState.teamA} reservePlayerNames={reservePlayerNames} teamSize={TEAM_SIZE} onRemove={(index) => onRemovePlayer(index, 'A')} />
         <div className="relative hidden w-px bg-border sm:block">
           <Button
             type="button"
@@ -1362,7 +1378,7 @@ function RecordScreen({ recordState, availablePlayers, playerMatchCounts, editin
           </Button>
           <div className="h-px flex-1 bg-border" />
         </div>
-        <TeamBox title="Tim B" tone="yellow" players={recordState.teamB} teamSize={TEAM_SIZE} onRemove={(name) => onRemovePlayer(name, 'B')} />
+        <TeamBox title="Tim B" tone="yellow" players={recordState.teamB} reservePlayerNames={reservePlayerNames} teamSize={TEAM_SIZE} onRemove={(index) => onRemovePlayer(index, 'B')} />
       </div>
 
       <div className="space-y-3">
@@ -1393,7 +1409,7 @@ function RecordScreen({ recordState, availablePlayers, playerMatchCounts, editin
   )
 }
 
-function TeamBox({ title, tone, players, teamSize, onRemove }: { title: string; tone: 'blue' | 'yellow'; players: string[]; teamSize: number; onRemove: (name: string) => void }) {
+function TeamBox({ title, tone, players, reservePlayerNames, teamSize, onRemove }: { title: string; tone: 'blue' | 'yellow'; players: string[]; reservePlayerNames: ReadonlySet<string>; teamSize: number; onRemove: (index: number) => void }) {
   const toneClassName = tone === 'blue' ? 'text-primary' : 'text-chart-3'
 
   return (
@@ -1407,11 +1423,11 @@ function TeamBox({ title, tone, players, teamSize, onRemove }: { title: string; 
       </header>
       <div className="overflow-hidden rounded-2xl border bg-background">
         {players.map((player, index) => (
-          <div key={player} className="flex min-h-11 items-center gap-2 border-b px-2.5 last:border-b-0">
+          <div key={`${player}-${index}`} className="flex min-h-11 items-center gap-2 border-b px-2.5 last:border-b-0">
             <GripVertical className="size-4 shrink-0 text-muted-foreground/60" aria-hidden="true" />
-            <PlayerAvatar name={player} seed={index} />
+            <PlayerAvatar name={player} seed={index} isReserve={reservePlayerNames.has(player)} />
             <span className="min-w-0 flex-1 truncate text-sm font-medium">{player}</span>
-            <Button type="button" variant="ghost" size="icon-sm" className="rounded-lg text-muted-foreground hover:text-foreground" aria-label={`Hapus ${player} dari ${title}`} onClick={() => onRemove(player)}>
+            <Button type="button" variant="ghost" size="icon-sm" className="rounded-lg text-muted-foreground hover:text-foreground" aria-label={`Hapus ${player} dari ${title}`} onClick={() => onRemove(index)}>
               <X />
             </Button>
           </div>
@@ -1461,7 +1477,7 @@ function SavedTeam({ label, title, players, winner = false }: { label: string; t
         <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-1 text-xs font-medium">
-        {players.map((player) => <span key={player}>{player}</span>)}
+        {players.map((player, index) => <span key={`${player}-${index}`}>{player}</span>)}
       </CardContent>
     </Card>
   )
@@ -1896,14 +1912,16 @@ function ScoreMetric({ label, value, tone }: { label: string; value: string | nu
   )
 }
 
-function PlayerAvatar({ name, seed }: { name: string; seed?: number }) {
+function PlayerAvatar({ name, seed, isReserve = false }: { name: string; seed?: number; isReserve?: boolean }) {
   const initials = name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
   const tones = ['bg-primary text-primary-foreground', 'bg-chart-3 text-white', 'bg-chart-4 text-white', 'bg-chart-5 text-white', 'bg-foreground text-background']
   const toneSeed = seed ?? Array.from(name).reduce((total, character) => total + character.charCodeAt(0), 0)
 
   return (
-    <ShadAvatar size="sm" className={tones[toneSeed % tones.length]}>
-      <AvatarFallback className="bg-transparent text-[10px] font-semibold text-current">{initials}</AvatarFallback>
+    <ShadAvatar size="sm" className={isReserve ? 'bg-muted-foreground text-background' : tones[toneSeed % tones.length]}>
+      <AvatarFallback className="bg-transparent text-[10px] font-semibold text-current">
+        {isReserve ? <UserRound className="size-3.5" aria-hidden="true" /> : initials}
+      </AvatarFallback>
     </ShadAvatar>
   )
 }

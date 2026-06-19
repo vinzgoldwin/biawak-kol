@@ -56,6 +56,8 @@ function isRosterPlayer(value: unknown): value is RosterPlayer {
     typeof value.id === 'string'
     && typeof value.name === 'string'
     && (value.isHiddenFromTeams === undefined || typeof value.isHiddenFromTeams === 'boolean')
+    && (value.isRepeatable === undefined || typeof value.isRepeatable === 'boolean')
+    && (value.isExcludedFromLeaderboard === undefined || typeof value.isExcludedFromLeaderboard === 'boolean')
   )
 }
 
