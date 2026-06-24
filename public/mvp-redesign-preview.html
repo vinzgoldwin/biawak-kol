@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Biawak KOL — MVP Wall Redesign Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Allura&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,900&family=Inter:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&family=Playfair+Display:ital,wght@0,500;0,700;0,900;1,700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --emerald:#00A63E; --emerald-deep:#007a2e; --mint:#78F2BC; --ink:#0b0f0c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#e9ece8;font-family:'Inter',system-ui,sans-serif;color:var(--ink)}
+  .stage{min-height:100vh;display:grid;grid-template-columns:1fr;justify-items:center;padding:32px 16px 80px;gap:24px}
+  .stage-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;font-size:13px;color:#3a4540}
+  .stage-bar b{font-family:'DM Sans';letter-spacing:.02em}
+  .picker{position:sticky;bottom:16px;z-index:50;display:flex;gap:8px;padding:8px;border-radius:999px;background:rgba(11,15,12,.9);backdrop-filter:blur(10px);box-shadow:0 12px 32px rgba(0,0,0,.2)}
+  .picker button{width:40px;height:40px;border:0;border-radius:999px;background:transparent;color:#cfd6cf;font-family:'JetBrains Mono';font-weight:700;font-size:14px;cursor:pointer;transition:.2s}
+  .picker button:hover{background:rgba(255,255,255,.08)}
+  .picker button[aria-pressed="true"]{background:var(--emerald);color:#fff;box-shadow:0 0 0 2px rgba(120,242,188,.5) inset}
+  .picker .label{align-self:center;color:#9aa6a0;font-size:11px;letter-spacing:.2em;text-transform:uppercase;padding:0 6px 0 10px}
+
+  /* iPhone frame */
+  .phone{width:390px;height:844px;border-radius:54px;background:#0a0d0b;padding:14px;box-shadow:0 30px 80px rgba(0,0,0,.32),inset 0 0 0 2px #1c211f;position:relative;overflow:hidden}
+  .phone::before{content:"";position:absolute;top:18px;left:50%;transform:translateX(-50%);width:118px;height:32px;background:#050706;border-radius:18px;z-index:60}
+  .screen{width:100%;height:100%;border-radius:42px;overflow:hidden;position:relative;background:#fff}
+  .screen-scroll{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+  .screen-scroll::-webkit-scrollbar{width:0;height:0}
+  .statusbar{position:absolute;top:0;left:0;right:0;height:48px;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:0 26px;font-size:13px;font-weight:600;color:inherit;pointer-events:none}
+  .statusbar .right{display:flex;gap:5px;align-items:center}
+  .sig{display:inline-flex;gap:2px;align-items:flex-end}
+  .sig i{display:block;width:3px;background:currentColor;border-radius:1px}
+  .sig i:nth-child(1){height:4px}.sig i:nth-child(2){height:6px}.sig i:nth-child(3){height:8px}.sig i:nth-child(4){height:10px}
+  .bat{width:24px;height:12px;border:1.5px solid currentColor;border-radius:3px;position:relative;opacity:.9}
+  .bat::after{content:"";position:absolute;inset:2px;border-radius:1px;background:currentColor}
+
+  .design{display:none;height:100%}
+  .design[data-active="true"]{display:block}
+
+  /* shared crest inline */
+  .crest{display:block}
+  .player-photo{width:100%;height:100%;object-fit:cover;display:block}
+
+  /* top utility row for mockups */
+  .utilbar{position:absolute;top:48px;left:0;right:0;z-index:30;display:flex;align-items:center;justify-content:space-between;padding:6px 18px;font-size:11px;font-family:'Inter';font-weight:600;letter-spacing:.04em;color:inherit;background:transparent;pointer-events:none}
+  .utilbar .brand-dot{display:flex;align-items:center;gap:6px}
+  .utilbar .brand-dot svg{width:20px;height:20px}
+
+  /* ============================ DESIGN 1 — EDITORIAL MAGAZINE ============================ */
+  .d1{--bg:#fbfaf6;--ink:#1a1d1a;--rule:#cfc9bd;--muted:#7a766c;--accent:#0a3d22}
+  .d1 .screen{background:var(--bg);color:var(--ink)}
+  .d1 .scroll{padding:54px 22px 110px}
+  .d1 .utilbar{color:var(--ink)}
+  .d1 .head{display:flex;flex-direction:column;gap:6px;padding-top:10px;border-top:1px solid var(--ink);margin-bottom:26px}
+  .d1 .eyebrow{font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .d1 .h1{font-family:'Playfair Display',serif;font-weight:900;font-size:46px;line-height:.92;letter-spacing:-.02em;margin:2px 0 0}
+  .d1 .h1 em{font-style:italic;font-weight:500;color:var(--muted)}
+  .d1 .sub{font-size:13px;color:var(--muted);margin-top:6px;max-width:240px;line-height:1.5}
+  .d1 .poster{margin-top:6px;border-top:1px solid var(--rule);padding-top:16px}
+  .d1 .poster img{width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:2px;filter:saturate(.92)}
+  .d1 .cap{display:flex;justify-content:space-between;align-items:flex-end;margin-top:14px;gap:12px}
+  .d1 .cap .name{font-family:'DM Sans';font-weight:900;font-size:30px;line-height:.96;letter-spacing:-.03em;text-transform:uppercase}
+  .d1 .cap .month{font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);font-weight:700;text-align:right;white-space:nowrap}
+  .d1 .stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);margin-top:18px}
+  .d1 .stat{padding:12px 4px;border-right:1px solid var(--rule);text-align:center}
+  .d1 .stat:last-child{border-right:0}
+  .d1 .stat .v{font-family:'Playfair Display';font-weight:700;font-size:24px;line-height:1}
+  .d1 .stat .l{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:6px;font-weight:700}
+  .d1 .pull{font-family:'Playfair Display';font-style:italic;font-weight:500;font-size:16px;line-height:1.45;color:var(--ink);margin:22px 4px 0;position:relative;padding-left:16px}
+  .d1 .pull::before{content:"“";position:absolute;left:-2px;top:-6px;font-size:34px;font-weight:900;color:var(--accent)}
+  .d1 .acts{display:flex;gap:10px;margin-top:24px}
+  .d1 .btn{flex:1;padding:13px;border-radius:2px;border:1px solid var(--ink);background:transparent;color:var(--ink);font-family:'Inter';font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+  .d1 .btn.primary{background:var(--ink);color:#fff}
+  .d1 .prev{margin-top:32px;border-top:1px solid var(--rule);padding-top:18px}
+  .d1 .prev-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+  .d1 .prev-h .t{font-size:10px;letter-spacing:.28em;text-transform:uppercase;font-weight:700}
+  .d1 .prev-h .n{font-family:'JetBrains Mono';font-size:10px;color:var(--muted)}
+  .d1 .prev-row{display:flex;gap:18px;overflow-x:auto;padding-bottom:4px}
+  .d1 .prev-row .it{flex:0 0 84px;text-align:center}
+  .d1 .prev-row .ph{width:84px;height:108px;border-radius:2px;overflow:hidden;border:1px solid var(--rule)}
+  .d1 .prev-row .m{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-top:8px;font-weight:700}
+  .d1 .prev-row .n{font-size:13px;font-weight:700;margin-top:2px;letter-spacing:-.01em}
+
+  /* ============================ DESIGN 2 — STADIUM SPOTLIGHT ============================ */
+  .d2{--bg:#0a0d0b;--card:#101613;--ink:#f4f6f3;--muted:#8a948d;--accent:#00e06a;--accent-2:#78F2BC}
+  .d2 .screen{background:var(--bg);color:var(--ink)}
+  .d2 .scroll{padding:54px 18px 110px}
+  .d2 .utilbar{color:var(--ink)}
+  .d2::after{content:"";position:absolute;width:420px;height:420px;border-radius:50%;top:60px;left:50%;transform:translateX(-50%);background:radial-gradient(circle,rgba(0,224,106,.22),transparent 60%);filter:blur(20px);pointer-events:none;z-index:1}
+  .d2 .head{position:relative;z-index:2;margin-bottom:16px}
+  .d2 .eyebrow{font-size:10px;letter-spacing:.34em;text-transform:uppercase;color:var(--accent);font-weight:800}
+  .d2 .h1{font-family:'DM Sans';font-weight:900;font-size:40px;line-height:.94;letter-spacing:-.025em;text-transform:uppercase;margin-top:6px}
+  .d2 .sub{font-size:13px;color:var(--muted);margin-top:6px}
+  .d2 .poster{position:relative;z-index:2;border-radius:22px;overflow:hidden;aspect-ratio:4/5;background:#000;box-shadow:0 24px 48px rgba(0,0,0,.5),0 0 0 1px rgba(120,242,188,.12)}
+  .d2 .poster img{width:100%;height:100%;object-fit:cover;opacity:.92}
+  .d2 .poster .grad{position:absolute;inset:0;background:radial-gradient(circle at 78% 12%,rgba(0,224,106,.35),transparent 35%),linear-gradient(90deg,rgba(0,0,0,.78) 0%,transparent 55%),linear-gradient(180deg,rgba(0,0,0,.1) 40%,rgba(0,0,0,.95) 100%)}
+  .d2 .poster .crest{position:absolute;top:18px;left:18px;width:62px;filter:drop-shadow(0 0 12px rgba(0,224,106,.6))}
+  .d2 .poster .rail{position:absolute;left:16px;top:120px;display:flex;flex-direction:column;gap:18px}
+  .d2 .rail-it{display:flex;flex-direction:column;align-items:center;gap:4px;color:#fff;width:46px;text-align:center}
+  .d2 .rail-it .ic{width:26px;height:26px;display:grid;place-items:center;opacity:.85}
+  .d2 .rail-it .ic svg{width:22px;height:22px}
+  .d2 .rail-it .l{font-size:8px;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:#cfe8d8}
+  .d2 .rail-it .v{font-family:'DM Sans';font-weight:900;font-size:20px;line-height:1}
+  .d2 .pname{position:absolute;left:0;right:0;bottom:24px;text-align:center;padding:0 18px;color:#fff}
+  .d2 .pname .first{font-family:'Allura';font-size:54px;line-height:.8;letter-spacing:-.02em;display:block;text-shadow:0 4px 20px rgba(0,0,0,.5)}
+  .d2 .pname .last{font-family:'DM Sans';font-weight:900;font-size:44px;line-height:.85;letter-spacing:-.03em;text-transform:uppercase;display:block;margin-top:2px}
+  .d2 .pname .mo{margin-top:14px;display:flex;align-items:center;justify-content:center;gap:12px;color:var(--accent)}
+  .d2 .pname .mo .ln{width:36px;height:1px;background:currentColor}
+  .d2 .pname .mo .t{font-size:11px;letter-spacing:.36em;text-transform:uppercase;font-weight:900}
+  .d2 .acts{position:relative;z-index:2;display:flex;gap:10px;margin-top:18px}
+  .d2 .btn{flex:1;height:48px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:var(--ink);font-family:'Inter';font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;backdrop-filter:blur(8px)}
+  .d2 .btn.primary{background:var(--accent);color:#04210f;border-color:transparent}
+  .d2 .prev{position:relative;z-index:2;margin-top:24px}
+  .d2 .prev-h{font-size:10px;letter-spacing:.24em;text-transform:uppercase;font-weight:800;color:var(--accent);margin-bottom:12px;display:flex;align-items:center;gap:10px}
+  .d2 .prev-h .ln{flex:1;height:1px;background:rgba(255,255,255,.1)}
+  .d2 .prev-row{display:flex;gap:14px;overflow-x:auto;padding-bottom:4px}
+  .d2 .prev-row .it{width:88px;text-align:center}
+  .d2 .prev-row .ph{width:88px;height:88px;border-radius:999px;object-fit:cover;border:2px solid var(--accent);box-shadow:0 0 0 3px rgba(0,224,106,.12);background:#000}
+  .d2 .prev-row .m{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-top:8px;font-weight:700}
+  .d2 .prev-row .n{font-size:13px;font-weight:800;margin-top:2px;color:var(--ink)}
+
+  /* ============================ DESIGN 3 — AURORA GLASS ============================ */
+  .d3{--ink:#14231c;--muted:#5d7268;--accent:#0a6e3f;--glass:rgba(255,255,255,.55);--glass-2:rgba(255,255,255,.35)}
+  .d3 .screen{background:
+    radial-gradient(circle at 20% 8%,#d9fbe9 0%,transparent 40%),
+    radial-gradient(circle at 88% 20%,#e6dcff 0%,transparent 42%),
+    radial-gradient(circle at 70% 92%,#ffe6d4 0%,transparent 45%),
+    radial-gradient(circle at 8% 78%,#daefff 0%,transparent 40%),
+    linear-gradient(180deg,#f3fbf7,#eef3ff);color:var(--ink)}
+  .d3 .scroll{padding:54px 20px 110px}
+  .d3 .utilbar{color:var(--ink)}
+  .d3 .head{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+  .d3 .head .pill{padding:6px 12px;border-radius:999px;background:var(--glass);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--accent);border:1px solid rgba(255,255,255,.6)}
+  .d3 .head .t{font-family:'DM Sans';font-weight:900;font-size:22px;letter-spacing:-.02em}
+  .d3 .poster{position:relative;border-radius:32px;overflow:hidden;aspect-ratio:4/5;box-shadow:0 22px 50px rgba(40,80,60,.18),0 4px 14px rgba(40,80,60,.12)}
+  .d3 .poster img{width:100%;height:100%;object-fit:cover}
+  .d3 .poster .glass{position:absolute;inset:0;background:linear-gradient(180deg,rgba(20,35,28,.0) 35%,rgba(20,35,28,.45) 100%)}
+  .d3 .poster .crest{position:absolute;top:16px;left:16px;width:54px;filter:drop-shadow(0 6px 16px rgba(0,0,0,.3))}
+  .d3 .bubbles{position:absolute;inset:0;pointer-events:none}
+  .d3 .bb{position:absolute;width:84px;height:84px;border-radius:28px;background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.7);box-shadow:0 12px 28px rgba(40,80,60,.14);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--ink)}
+  .d3 .bb .v{font-family:'DM Sans';font-weight:900;font-size:22px;line-height:1}
+  .d3 .bb .l{font-size:8px;letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--muted)}
+  .d3 .bb.ic-glyph .glyph{width:22px;height:22px;color:var(--accent)}
+  .d3 .bb.rate{top:62%;left:14px}
+  .d3 .bb.gm{top:52%;right:14px}
+  .d3 .bb.wn{top:74%;right:38%}
+  .d3 .pname{position:absolute;left:0;right:0;bottom:22px;text-align:center;color:#fff;padding:0 20px;text-shadow:0 4px 18px rgba(0,0,0,.45)}
+  .d3 .pname .first{font-family:'Allura';font-size:52px;line-height:.8;display:block}
+  .d3 .pname .last{font-family:'DM Sans';font-weight:900;font-size:38px;line-height:.85;letter-spacing:-.03em;text-transform:uppercase;display:block}
+  .d3 .pname .mo{margin-top:10px;font-size:11px;letter-spacing:.3em;text-transform:uppercase;font-weight:700;color:var(--mint)}
+  .d3 .acts{display:flex;gap:10px;margin-top:20px}
+  .d3 .btn{flex:1;height:48px;border-radius:22px;border:1px solid rgba(255,255,255,.7);background:var(--glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:var(--ink);font-family:'Inter';font-weight:700;font-size:13px;cursor:pointer}
+  .d3 .btn.primary{background:linear-gradient(135deg,var(--emerald),#0ec066);color:#fff;border-color:transparent;box-shadow:0 12px 24px rgba(0,166,62,.35)}
+  .d3 .prev{margin-top:28px}
+  .d3 .prev-h{font-size:10px;letter-spacing:.24em;text-transform:uppercase;font-weight:800;color:var(--accent);margin-bottom:12px}
+  .d3 .prev-row{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px}
+  .d3 .prev-row .it{width:96px}
+  .d3 .prev-row .glass-tile{background:var(--glass-2);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.7);border-radius:18px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:8px}
+  .d3 .prev-row .ph{width:76px;height:76px;border-radius:999px;object-fit:cover;border:2px solid #fff;box-shadow:0 6px 14px rgba(40,80,60,.18)}
+  .d3 .prev-row .m{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .d3 .prev-row .n{font-size:13px;font-weight:800;color:var(--ink)}
+
+  /* ============================ DESIGN 4 — RETRO YEARBOOK ============================ */
+  .d4{--paper:#f1e7d3;--paper-2:#e8dcc2;--ink:#2a200f;--sepia:#8a6a3b;--stamp:#b23030;--accent:#3c6a2a}
+  .d4 .screen{background:var(--paper);color:var(--ink)}
+  .d4 .screen::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 14% 6%,rgba(180,140,80,.16),transparent 40%),radial-gradient(circle at 90% 80%,rgba(180,140,80,.14),transparent 45%);mix-blend-mode:multiply;pointer-events:none}
+  .d4 .scroll{padding:54px 22px 110px;font-family:'DM Sans'}
+  .d4 .utilbar{color:var(--ink)}
+  .d4 .head{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:20px;position:relative}
+  .d4 .head .left .ey{font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--sepia);font-weight:700}
+  .d4 .head .left .t{font-family:'DM Sans';font-weight:900;font-size:34px;line-height:.92;letter-spacing:-.02em;text-transform:uppercase;margin-top:2px}
+  .d4 .head .vol{text-align:right;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--sepia);font-weight:700;line-height:1.4}
+  .d4 .head .vol b{display:block;font-size:13px;color:var(--ink)}
+  .d4 .frame{position:relative;background:#fff8eb;border:2px solid var(--ink);padding:12px;box-shadow:6px 6px 0 rgba(42,32,15,.12)}
+  .d4 .poster{aspect-ratio:4/5;overflow:hidden;position:relative;filter:sepia(.18) saturate(.9)}
+  .d4 .poster img{width:100%;height:100%;object-fit:cover}
+  .d4 .stamp{position:absolute;top:18px;right:18px;width:96px;height:96px;border-radius:50%;border:2.5px solid var(--stamp);color:var(--stamp);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-family:'DM Sans';font-weight:900;letter-spacing:.16em;text-transform:uppercase;font-size:9px;transform:rotate(-12deg);background:rgba(241,231,211,.5);box-shadow:inset 0 0 0 1.5px var(--stamp)}
+  .d4 .stamp .big{font-family:'Playfair Display';font-size:22px;letter-spacing:0;line-height:1}
+  .d4 .stamp .yr{margin-top:2px;font-size:8px}
+  .d4 .crest4{position:absolute;left:18px;bottom:18px;width:54px;opacity:.92}
+  .d4 .ledger{margin-top:18px;border:1.5px solid var(--ink);background:#fff8eb}
+  .d4 .ledger .row{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr 1.2fr;border-bottom:1px solid rgba(42,32,15,.2)}
+  .d4 .ledger .row:last-child{border-bottom:0}
+  .d4 .ledger .row.head{background:rgba(42,32,15,.08);font-size:9px;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:var(--sepia)}
+  .d4 .ledger .cell{padding:8px 10px;font-family:'JetBrains Mono';font-size:13px;font-weight:700;border-right:1px solid rgba(42,32,15,.18)}
+  .d4 .ledger .cell:last-child{border-right:0}
+  .d4 .ledger .cell.lbl{font-family:'DM Sans';font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+  .d4 .name-cap{margin-top:18px;display:flex;align-items:baseline;justify-content:space-between;gap:14px}
+  .d4 .name-cap .first{font-family:'Allura';font-size:46px;line-height:.7;color:var(--ink)}
+  .d4 .name-cap .last{font-family:'DM Sans';font-weight:900;font-size:28px;letter-spacing:-.02em;text-transform:uppercase;color:var(--accent)}
+  .d4 .name-cap .mo{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--sepia);font-weight:700;text-align:right;white-space:nowrap}
+  .d4 .acts{display:flex;gap:10px;margin-top:20px}
+  .d4 .btn{flex:1;height:46px;border:2px solid var(--ink);background:transparent;color:var(--ink);font-family:'DM Sans';font-weight:800;font-size:12px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;box-shadow:4px 4px 0 var(--ink)}
+  .d4 .btn:active{transform:translate(2px,2px);box-shadow:0 0 0 var(--ink)}
+  .d4 .btn.primary{background:var(--accent);color:#fff8eb;box-shadow:4px 4px 0 var(--ink)}
+  .d4 .prev{margin-top:30px}
+  .d4 .prev-h{display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:800;color:var(--sepia)}
+  .d4 .prev-h .ln{flex:1;height:0;border-top:2px dashed var(--sepia)}
+  .d4 .prev-row{display:flex;gap:16px;overflow-x:auto;padding-bottom:8px}
+  .d4 .prev-row .it{flex:0 0 96px}
+  .d4 .pol{background:#fff8eb;border:2px solid var(--ink);padding:8px 8px 8px 10px;box-shadow:3px 3px 0 rgba(42,32,15,.15)}
+  .d4 .pol .ph{width:100%;aspect-ratio:1;object-fit:cover;filter:sepia(.3) saturate(.8)}
+  .d4 .pol .m{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--sepia);font-weight:700;margin-top:2px}
+  .d4 .pol .n{font-size:11px;font-weight:800;color:var(--ink);letter-spacing:-.01em;line-height:1}
+
+  /* ============================ DESIGN 5 — NEO EDITORIAL BRUTALIST ============================ */
+  .d5{--ink:#0a0a0a;--bg:#f2efe7;--pop:#ff5b1f;--accent:#00c248;--grid:rgba(10,10,10,.12)}
+  .d5 .screen{background:var(--bg);color:var(--ink)}
+  .d5 .scroll{padding:54px 16px 110px}
+  .d5 .utilbar{color:var(--ink)}
+  .d5 .head{border:3px solid var(--ink);background:var(--accent);padding:14px;margin-bottom:18px;position:relative}
+  .d5 .head::before{content:"";position:absolute;inset:-3px;border:3px solid var(--ink);transform:translate(5px,5px);z-index:-1;background:transparent}
+  .d5 .head .ey{font-family:'JetBrains Mono';font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#04210f}
+  .d5 .head .t{font-family:'DM Sans';font-weight:900;font-size:46px;line-height:.86;letter-spacing:-.04em;text-transform:uppercase;color:#0a1a0e;margin-top:4px}
+  .d5 .head .t span{background:var(--ink);color:var(--accent);padding:0 6px}
+  .d5 .poster{position:relative;border:3px solid var(--ink);background:var(--ink);overflow:hidden;aspect-ratio:4/5;box-shadow:8px 8px 0 var(--ink)}
+  .d5 .poster img{width:100%;height:100%;object-fit:cover}
+  .d5 .poster .corner{position:absolute;top:0;right:0;background:var(--pop);color:#0a0a0a;font-family:'JetBrains Mono';font-weight:700;font-size:11px;padding:6px 10px;border-left:3px solid var(--ink);border-bottom:3px solid var(--ink);letter-spacing:.04em}
+  .d5 .cr5{position:absolute;top:14px;left:14px;width:48px;background:var(--ink);padding:4px;border:2px solid var(--mint)}
+  .d5 .pname{position:absolute;left:14px;right:14px;bottom:14px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+  .d5 .pname .nm{color:#fff}
+  .d5 .pname .first{font-family:'Allura';font-size:46px;line-height:.7;display:block}
+  .d5 .pname .last{font-family:'DM Sans';font-weight:900;font-size:34px;line-height:.84;letter-spacing:-.04em;text-transform:uppercase;display:block;letter-spacing:-.02em}
+  .d5 .pname .mo{color:var(--accent);font-family:'JetBrains Mono';font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--ink);padding:6px 8px;align-self:flex-start}
+  .d5 .grid-stats{margin-top:14px;border:3px solid var(--ink);display:grid;grid-template-columns:repeat(3,1fr)}
+  .d5 .grid-stats .cell{padding:12px 10px;border-right:3px solid var(--ink);background:var(--bg);display:flex;flex-direction:column;gap:4px}
+  .d5 .grid-stats .cell:last-child{border-right:0}
+  .d5 .grid-stats .cell .l{font-family:'JetBrains Mono';font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#666}
+  .d5 .grid-stats .cell .v{font-family:'DM Sans';font-weight:900;font-size:34px;line-height:.86;letter-spacing:-.04em}
+  .d5 .grid-stats .cell .v span{font-size:14px;color:#666;font-weight:700}
+  .d5 .acts{display:flex;gap:10px;margin-top:16px}
+  .d5 .btn{flex:1;height:50px;border:3px solid var(--ink);background:transparent;color:var(--ink);font-family:'JetBrains Mono';font-weight:700;font-size:12px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;box-shadow:5px 5px 0 var(--ink)}
+  .d5 .btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--ink)}
+  .d5 .btn.primary{background:var(--pop);color:#0a0a0a}
+  .d5 .prev{margin-top:26px}
+  .d5 .prev-h{font-family:'JetBrains Mono';font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+  .d5 .prev-h .ln{flex:1;height:3px;background:var(--ink)}
+  .d5 .prev-row{display:flex;gap:14px;overflow-x:auto;padding-bottom:6px}
+  .d5 .prev-row .it{flex:0 0 84px;border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);background:var(--bg)}
+  .d5 .prev-row .ph{width:100%;aspect-ratio:1;object-fit:cover;filter:grayscale(.6) contrast(1.05)}
+  .d5 .prev-row .cap{padding:6px 8px;border-top:3px solid var(--ink)}
+  .d5 .prev-row .m{font-family:'JetBrains Mono';font-size:8px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#666}
+  .d5 .prev-row .n{font-family:'DM Sans';font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:-.02em;line-height:1}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="stage-bar">
+    <span>Biawak KOL — <b>MVP Wall Redesign Preview</b></span>
+    <span aria-hidden="true">·</span>
+    <span>Open via dev server or <code>file://</code>. Switch designs below.</span>
+  </div>
+
+  <div class="phone">
+    <div class="screen"></div>
+  </div>
+
+  <div class="picker">
+    <span class="label">Design</span>
+    <button type="button" data-design="1" aria-pressed="true">1</button>
+    <button type="button" data-design="2" aria-pressed="false">2</button>
+    <button type="button" data-design="3" aria-pressed="false">3</button>
+    <button type="button" data-design="4" aria-pressed="false">4</button>
+    <button type="button" data-design="5" aria-pressed="false">5</button>
+  </div>
+</div>
+
+<!-- reusable SVG crest (component) -->
+<template id="crest">
+  <svg class="crest" viewBox="0 0 180 210" fill="none" aria-label="Biawak KOL MVP">
+    <defs>
+      <linearGradient id="mvp-crest-green" x1="22" x2="158" y1="12" y2="198" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#00A63E"/><stop offset="1" stop-color="#78F2BC"/>
+      </linearGradient>
+    </defs>
+    <path d="M90 11 158 35v70c0 45-27 78-68 99-41-21-68-54-68-99V35L90 11Z" fill="rgba(0,0,0,0.1)" stroke="url(#mvp-crest-green)" stroke-width="6"/>
+    <path d="M59 61h62" stroke="url(#mvp-crest-green)" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M63 61 58 38l15 11 17-24 17 24 15-11-5 23" fill="rgba(0,166,62,0.2)" stroke="url(#mvp-crest-green)" stroke-linejoin="round" stroke-width="5"/>
+    <text x="90" y="113" text-anchor="middle" fill="#F4F4F5" font-family="Georgia, serif" font-size="42" font-weight="900" letter-spacing="-1.3">MVP</text>
+    <text x="90" y="140" text-anchor="middle" fill="#78F2BC" font-family="Inter, sans-serif" font-size="12.5" font-weight="900" letter-spacing="1.6">BIAWAK KOL</text>
+    <path d="m90 154 4.8 9.7 10.7 1.5-7.7 7.5 1.8 10.6-9.6-5-9.6 5 1.8-10.6-7.7-7.5 10.7-1.5L90 154Z" fill="#F4F4F5"/>
+  </svg>
+</template>
+
+<template id="skel-photo"></template>
+
+<script>
+  // -------------------- shared mock data --------------------
+  const MONTH_LABEL = 'Juni 2026'
+  const MONTH_SHORT = 'Juni'
+  const PLAYER_FIRST = 'Rangga'
+  const PLAYER_LAST = 'Pratama'
+  const PLAYER_NAME = `${PLAYER_FIRST} ${PLAYER_LAST}`
+  const STATS = { rate: '78%', games: 32, wins: 25, losses: 7 }
+  const PREV = [
+    { name: 'Aldi Saputra', month: 'Mei 2026' },
+    { name: 'Bayu Pranata', month: 'April 2026' },
+    { name: 'Candra Wijaya', month: 'Maret 2026' },
+    { name: 'Darto Kasino', month: 'Februari 2026' },
+    { name: 'Eko Sudarmo', month: 'Januari 2026' },
+  ]
+
+  // a stable photo URL using picsum (loads online; falls back gracefully)
+  // used in designs 1 & 4 to keep them feeling like real photos
+  const PHOTO = 'https://picsum.photos/seed/biawak-mvp/600/750'
+  const photo = (name) => `https://picsum.photos/seed/biawak-mvp-${encodeURIComponent(name)}/300/400`
+
+  // helper: inline-cloned crest with unique gradient id suffix
+  let crestId = 0
+  function cloneCrest(){
+    const svg = document.getElementById('crest').content.querySelector('svg').cloneNode(true)
+    const id = `cg-${crestId++}`
+    const grad = svg.querySelector('linearGradient')
+    grad.id = id
+    svg.querySelectorAll('[stroke="url(#mvp-crest-green)"]').forEach(el=>el.setAttribute('stroke',`url(#${id})`))
+    return svg
+  }
+
+  // icon helpers
+  function glyph(name, className=''){
+    if(name==='trophy') return `<svg class="${className}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v6a4 4 0 0 1-8 0V4Z"/><path d="M16 5h3v2a3 3 0 0 1-3 3M8 5H5v2a3 3 0 0 0 3 3"/><path d="M12 14v3M9 21h6M9 21a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>`
+    if(name==='ball') return `<svg class="${className}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.8"/><path d="M12 3.2v17.6M3.2 12h17.6M5.8 5.8c2.1 2.5 4.2 3.8 6.2 3.8s4.1-1.3 6.2-3.8M5.8 18.2c2.1-2.5 4.2-3.8 6.2-3.8s4.1 1.3 6.2 3.8"/></svg>`
+    if(name==='hoop') return `<svg class="${className}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h14M7 6l2 14h6l2-14M7.5 10h9M8.2 14h7.6M9 18h6"/></svg>`
+    return ''
+  }
+
+  // -------------------- builders --------------------
+  function buildDesign1(){
+    return `
+    <div class="design d1" data-active="true">
+      <div class="utilbar"><div class="brand-dot">BIAWAK KOL</div><div>AWARDS · VOL.01</div></div>
+      <div class="screen-scroll scroll">
+        <div class="head">
+          <span class="eyebrow">Biawak KOL Awards</span>
+          <h1 class="h1">MVP <em>Wall</em></h1>
+          <p class="sub">Monthly kings of the court, archived like club history.</p>
+        </div>
+        <div class="poster">
+          <img class="player-photo" src="${PHOTO}" alt="${PLAYER_NAME}"/>
+          <div class="cap">
+            <div class="name">${PLAYER_LAST}</div>
+            <div class="month">${MONTH_LABEL}<br/>No. 06 — June</div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="v">${STATS.rate}</div><div class="l">Win Rate</div></div>
+            <div class="stat"><div class="v">${STATS.games}</div><div class="l">Games</div></div>
+            <div class="stat"><div class="v">${STATS.wins}</div><div class="l">Wins</div></div>
+            <div class="stat"><div class="v">${STATS.losses}</div><div class="l">Losses</div></div>
+          </div>
+          <p class="pull">Satu trofi sebulan. Setiap minggu—lapangan. Bukan hadiah, adalah bukti.</p>
+          <div class="acts">
+            <button class="btn">Share</button>
+            <button class="btn primary">Update MVP</button>
+          </div>
+        </div>
+        <div class="prev">
+          <div class="prev-h"><span>Previous MVPs</span><span class="n">05 / 12</span></div>
+          <div class="prev-row">
+            ${PREV.map(p=>`
+              <div class="it"><div class="ph"><img class="player-photo" src="${photo(p.name)}" alt="${p.name}"/></div><div class="m">${p.month.split(' ')[0]}</div><div class="n">${p.name.split(' ')[0]}</div></div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`
+  }
+
+  function buildDesign2(){
+    return `
+    <div class="design d2" data-active="false">
+      <div class="utilbar"><div class="brand-dot">BIAWAK KOL</div><div>LIVE</div></div>
+      <div class="screen-scroll scroll">
+        <div class="head">
+          <div class="eyebrow">Biawak KOL Awards</div>
+          <h1 class="h1">MVP Wall</h1>
+          <p class="sub">Kings of the court, monthly.</p>
+        </div>
+        <div class="poster">
+          <img class="player-photo" src="${PHOTO}" alt="${PLAYER_NAME}"/>
+          <div class="grad"></div>
+          <div class="crest"></div>
+          <div class="rail">
+            <div class="rail-it"><div class="ic">${glyph('trophy')}</div><div class="l">Rate</div><div class="v">${STATS.rate}</div></div>
+            <div class="rail-it"><div class="ic">${glyph('ball')}</div><div class="l">Games</div><div class="v">${STATS.games}</div></div>
+            <div class="rail-it"><div class="ic">${glyph('hoop')}</div><div class="l">Wins</div><div class="v">${STATS.wins}</div></div>
+          </div>
+          <div class="pname">
+            <span class="first">${PLAYER_FIRST}</span>
+            <span class="last">${PLAYER_LAST}</span>
+            <div class="mo"><span class="ln"></span><span class="t">${MONTH_LABEL}</span><span class="ln"></span></div>
+          </div>
+        </div>
+        <div class="acts">
+          <button class="btn">↗ Share</button>
+          <button class="btn primary">⌘ Update MVP</button>
+        </div>
+        <div class="prev">
+          <div class="prev-h"><span>Previous MVPs</span><span class="ln"></span></div>
+          <div class="prev-row">
+            ${PREV.map(p=>`<div class="it"><img class="ph" src="${photo(p.name)}" alt="${p.name}"/><div class="m">${p.month}</div><div class="n">${p.name.split(' ')[0]}</div></div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`
+  }
+
+  function buildDesign3(){
+    return `
+    <div class="design d3" data-active="false">
+      <div class="utilbar"><div class="brand-dot">BIAWAK KOL</div><div>AWARDS</div></div>
+      <div class="screen-scroll scroll">
+        <div class="head">
+          <span class="pill">Biawak KOL Awards</span>
+          <span class="t">MVP Wall</span>
+        </div>
+        <div class="poster">
+          <img class="player-photo" src="${PHOTO}" alt="${PLAYER_NAME}"/>
+          <div class="glass"></div>
+          <div class="crest"></div>
+          <div class="bubbles">
+            <div class="bb rate ic-glyph"><div class="glyph">${glyph('trophy')}</div><div class="v">${STATS.rate}</div><div class="l">Rate</div></div>
+            <div class="bb gm ic-glyph"><div class="glyph">${glyph('ball')}</div><div class="v">${STATS.games}</div><div class="l">Games</div></div>
+            <div class="bb wn ic-glyph"><div class="glyph">${glyph('hoop')}</div><div class="v">${STATS.wins}</div><div class="l">Wins</div></div>
+          </div>
+          <div class="pname">
+            <span class="first">${PLAYER_FIRST}</span>
+            <span class="last">${PLAYER_LAST}</span>
+            <div class="mo">${MONTH_LABEL}</div>
+          </div>
+        </div>
+        <div class="acts">
+          <button class="btn">Share</button>
+          <button class="btn primary">Update MVP</button>
+        </div>
+        <div class="prev">
+          <div class="prev-h">Previous MVPs</div>
+          <div class="prev-row">
+            ${PREV.map(p=>`<div class="it glass-tile"><img class="ph" src="${photo(p.name)}" alt="${p.name}"/><div><div class="m">${p.month.split(' ')[0]}</div><div class="n">${p.name.split(' ')[0]}</div></div></div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`
+  }
+
+  function buildDesign4(){
+    return `
+    <div class="design d4" data-active="false">
+      <div class="utilbar"><div class="brand-dot">BIAWAK KOL</div><div>AR.1926</div></div>
+      <div class="screen-scroll scroll">
+        <div class="head">
+          <div class="left"><div class="ey">Biawak KOL Awards · Est. MMXXVI</div><div class="t">MVP Wall</div></div>
+          <div class="vol"><b>VOL.06</b>No.06<br/>June</div>
+        </div>
+        <div class="frame">
+          <div class="poster">
+            <img class="player-photo" src="${PHOTO}" alt="${PLAYER_NAME}"/>
+            <div class="stamp"><span class="big">MVP</span><span class="yr">JUN '26</span></div>
+            <div class="crest4"></div>
+          </div>
+          <div class="name-cap">
+            <div>
+              <div class="first">${PLAYER_FIRST}</div>
+              <div class="last">${PLAYER_LAST}</div>
+            </div>
+            <div class="mo">${MONTH_LABEL}<br/>TROFI #006</div>
+          </div>
+          <div class="ledger">
+            <div class="row head"><div class="cell lbl">Stat</div><div class="cell">Win</div><div class="cell">G</div><div class="cell">W</div><div class="cell">L</div></div>
+            <div class="row"><div class="cell lbl">Recorded</div><div class="cell">${STATS.rate}</div><div class="cell">${STATS.games}</div><div class="cell">${STATS.wins}</div><div class="cell">${STATS.losses}</div></div>
+          </div>
+        </div>
+        <div class="acts">
+          <button class="btn">Share</button>
+          <button class="btn primary">Update MVP</button>
+        </div>
+        <div class="prev">
+          <div class="prev-h"><span>Archived</span><span class="ln"></span></div>
+          <div class="prev-row">
+            ${PREV.map(p=>`<div class="it pol"><img class="ph" src="${photo(p.name)}" alt="${p.name}"/><div class="m">${p.month}</div><div class="n">${p.name.split(' ')[0]}</div></div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`
+  }
+
+  function buildDesign5(){
+    return `
+    <div class="design d5" data-active="false">
+      <div class="utilbar"><div class="brand-dot">BIAWAK·KOL</div><div>//26.06</div></div>
+      <div class="screen-scroll scroll">
+        <div class="head">
+          <div class="ey">> Awards.module // Biawak Kol</div>
+          <div class="t">MVP <span>W</span>all</div>
+        </div>
+        <div class="poster">
+          <img class="player-photo" src="${PHOTO}" alt="${PLAYER_NAME}"/>
+          <div class="corner">MVP / JUN'26</div>
+          <div class="cr5"></div>
+          <div class="pname">
+            <div class="nm"><span class="first">${PLAYER_FIRST}</span><span class="last">${PLAYER_LAST}</span></div>
+            <span class="mo">// ${MONTH_LABEL}</span>
+          </div>
+        </div>
+        <div class="grid-stats">
+          <div class="cell"><div class="l">rate</div><div class="v">${STATS.rate}</div></div>
+          <div class="cell"><div class="l">games</div><div class="v">${STATS.games}</div></div>
+          <div class="cell"><div class="l">wins</div><div class="v">${STATS.wins}<span>/${STATS.losses}</span></div></div>
+        </div>
+        <div class="acts">
+          <button class="btn">Share</button>
+          <button class="btn primary">Update MVP</button>
+        </div>
+        <div class="prev">
+          <div class="prev-h"><span>// Previous.MVPs</span><span class="ln"></span></div>
+          <div class="prev-row">
+            ${PREV.map(p=>`<div class="it"><img class="ph" src="${photo(p.name)}" alt="${p.name}"/><div class="cap"><div class="m">${p.month.split(' ')[0]}·26</div><div class="n">${p.name.split(' ')[0]}</div></div></div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`
+  }
+
+  const BUILDERS = {1:buildDesign1,2:buildDesign2,3:buildDesign3,4:buildDesign4,5:buildDesign5}
+
+  const screen = document.querySelector('.phone .screen')
+
+  function render(n){
+    screen.innerHTML = BUILDERS[n]()
+    // inject cloned crest SVG into every <div.crest|crest4|cr5> placeholder, keeping classes
+    screen.querySelectorAll('.crest, .crest4, .cr5').forEach(slot=>{
+      const svg = cloneCrest()
+      slot.classList.forEach(c=> svg.classList.add(c))
+      slot.replaceWith(svg)
+    })
+    // hide design canvases except the active one
+    screen.querySelectorAll('.design').forEach(d=>{
+      d.setAttribute('data-active', d.classList.contains(`d${n}`) ? 'true':'false')
+    })
+    // update picker
+    document.querySelectorAll('.picker button[data-design]').forEach(b=>{
+      b.setAttribute('aria-pressed', b.dataset.design===String(n) ? 'true':'false')
+    })
+  }
+
+  document.querySelectorAll('.picker button[data-design]').forEach(b=>{
+    b.addEventListener('click', ()=>render(Number(b.dataset.design)))
+  })
+  // keyboard 1-5
+  window.addEventListener('keydown', (e)=>{
+    if(e.key>='1' && e.key<='5') render(Number(e.key))
+  })
+
+  render(1)
+</script>
+</body>
+</html>
