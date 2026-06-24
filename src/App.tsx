@@ -42,6 +42,8 @@ import {
   type IconComponent,
 } from './icons'
 import { fetchSharedState, saveSharedState, SharedStateError, type SharedState } from './remote-state'
+import { fetchMonthlyAwards, isAwardAccessError, uploadMonthlyAward, type MonthlyAward, type UploadMonthlyAwardInput } from './remote-awards'
+import { MonthlyAwardScreen } from './monthly-award-screen'
 import { buildDashboardSummary, buildLeaderboard, buildPlayerStats, getMinimumQualifiedGames, type SummaryStat } from './stats'
 
 type Winner = 'A' | 'B'
@@ -81,8 +83,11 @@ type PendingProtectedAction = {
   onAllowed: () => void | Promise<void>
 }
 
+type MonthlyAwardSaveInput = Omit<UploadMonthlyAwardInput, 'accessCode'>
+
 const navIcon: Record<NavKey, IconComponent> = {
   dashboard: HomeIcon,
+  mvp: TrophyIcon,
   record: NotebookPen as IconComponent,
   saved: CheckCircleIcon,
   history: HistoryIcon,
@@ -300,7 +305,7 @@ function clearProtectedAccess() {
 }
 
 function isPersistentNavKey(value: string): value is Exclude<NavKey, 'saved'> {
-  return value === 'dashboard' || value === 'record' || value === 'history' || value === 'players'
+  return value === 'dashboard' || value === 'mvp' || value === 'record' || value === 'history' || value === 'players'
 }
 
 function getStoredActiveScreen(): NavKey {
@@ -338,7 +343,9 @@ function App() {
   const [dismissingUndoToastId, setDismissingUndoToastId] = useState<number | null>(null)
   const [editingGameId, setEditingGameId] = useState<number | null>(null)
   const [pendingProtectedAction, setPendingProtectedAction] = useState<PendingProtectedAction | null>(null)
+  const [monthlyAwards, setMonthlyAwards] = useState<MonthlyAward[]>([])
   const [isCopyingImage, setIsCopyingImage] = useState(false)
+  const [isSavingMonthlyAward, setIsSavingMonthlyAward] = useState(false)
   const [remoteVersion, setRemoteVersion] = useState(0)
   const [isSyncing, setIsSyncing] = useState(false)
   const imageExportRef = useRef<HTMLDivElement>(null)
@@ -423,6 +430,25 @@ function App() {
       shouldIgnore = true
     }
   }, [applySharedState, handleSharedStateError])
+
+  useEffect(() => {
+    let shouldIgnore = false
+
+    async function loadMonthlyAwards() {
+      try {
+        const awards = await fetchMonthlyAwards()
+        if (!shouldIgnore) setMonthlyAwards(awards)
+      } catch {
+        if (!shouldIgnore) toast.error('MVP bulanan belum bisa dimuat.', { duration: 5000 })
+      }
+    }
+
+    void loadMonthlyAwards()
+
+    return () => {
+      shouldIgnore = true
+    }
+  }, [])
 
   useEffect(() => {
     writeStoredArray(HISTORY_STORAGE_KEY, historyGames)
@@ -537,6 +563,33 @@ function App() {
     setPendingProtectedAction(null)
     void action()
     return true
+  }
+
+  const saveAward = (input: MonthlyAwardSaveInput) => {
+    const accessCode = getStoredProtectedPassword()
+    if (!accessCode) return Promise.resolve(false)
+
+    setIsSavingMonthlyAward(true)
+    return uploadMonthlyAward({ ...input, accessCode })
+      .then((awards) => {
+        setMonthlyAwards(awards)
+        toast.success('MVP updated.', { duration: 3000 })
+        return true
+      })
+      .catch((error: unknown) => {
+        if (isAwardAccessError(error)) clearProtectedAccess()
+        toast.error(error instanceof Error ? error.message : 'MVP belum bisa disimpan.', { duration: 5000 })
+        return false
+      })
+      .finally(() => setIsSavingMonthlyAward(false))
+  }
+
+  const runAwardSave = (input: MonthlyAwardSaveInput, onSuccess: () => void) => {
+    runProtectedAction('Simpan MVP Bulan Ini', () => {
+      void saveAward(input).then((saved) => {
+        if (saved) onSuccess()
+      })
+    })
   }
 
   const openBlankRecorder = () => {
@@ -793,6 +846,16 @@ function App() {
               isCopyingImage={isCopyingImage}
             />
           )}
+          {activeScreen === 'mvp' && (
+            <MonthlyAwardScreen
+              awards={monthlyAwards}
+              monthOptions={monthOptions}
+              rosterPlayers={rosterPlayers}
+              historyGames={historyGames}
+              isSaving={isSavingMonthlyAward}
+              onSave={runAwardSave}
+            />
+          )}
           {activeScreen === 'record' && (
             <RecordScreen
               recordState={recordState}
@@ -940,7 +1003,7 @@ function UndoToastView({ message, actionLabel, isDismissing, onAction, onDismiss
 function Nav({ activeScreen, onNavigate, variant }: { activeScreen: NavKey; onNavigate: (screen: NavKey) => void; variant: 'side' | 'bottom' }) {
   if (variant === 'bottom') {
     return (
-      <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto grid w-full max-w-[430px] grid-cols-4 gap-1 border-t bg-background/95 px-3 pb-[calc(0.35rem+env(safe-area-inset-bottom))] pt-1.5 backdrop-blur md:hidden" aria-label="Navigasi utama">
+      <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto grid w-full max-w-[430px] grid-cols-5 gap-1 border-t bg-background/95 px-3 pb-[calc(0.35rem+env(safe-area-inset-bottom))] pt-1.5 backdrop-blur md:hidden" aria-label="Navigasi utama">
         {navItems.map((item) => {
           const Icon = navIcon[item.id]
 

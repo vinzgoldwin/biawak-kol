@@ -1,4 +1,4 @@
-export type NavKey = 'dashboard' | 'record' | 'saved' | 'history' | 'players'
+export type NavKey = 'dashboard' | 'mvp' | 'record' | 'saved' | 'history' | 'players'
 
 export type LeaderboardRow = {
   name: string
@@ -54,6 +54,7 @@ export type RosterPlayer = {
 
 export const navItems: Array<{ id: NavKey; label: string; icon: string }> = [
   { id: 'dashboard', label: 'Beranda', icon: '◧' },
+  { id: 'mvp', label: 'MVP', icon: '♕' },
   { id: 'record', label: 'Catat', icon: '◎' },
   { id: 'history', label: 'Riwayat', icon: '◫' },
   { id: 'players', label: 'Pemain', icon: '◌' },

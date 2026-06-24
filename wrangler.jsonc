@@ -9,6 +9,12 @@
       "id": "77f4eb08740c4f66aab125f96f5b4ffc"
     }
   ],
+  "r2_buckets": [
+    {
+      "binding": "BIAWAK_KOL_MEDIA",
+      "bucket_name": "biawak-kol-media"
+    }
+  ],
   "observability": {
     "enabled": true
   }
