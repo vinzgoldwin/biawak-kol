@@ -21,6 +21,7 @@ type MutablePlayerStats = {
   wins: number
   losses: number
   points: number
+  profile: PlayerCard['profile']
   recentGames: PlayerCard['recentGames']
   sourceIndex: number
 }
@@ -49,6 +50,7 @@ const createEmptyStats = (player: RosterPlayer, sourceIndex: number, includeSeed
   wins: includeSeedStats ? player.seedStats?.wins ?? 0 : 0,
   losses: includeSeedStats ? player.seedStats?.losses ?? 0 : 0,
   points: includeSeedStats ? player.seedStats?.points ?? 0 : 0,
+  profile: player.profile,
   recentGames: [],
   sourceIndex,
 })
@@ -74,6 +76,7 @@ const toPlayerCard = (player: MutablePlayerStats): PlayerCard => ({
   points: player.points,
   coefficient: formatCoefficient(player.points, player.games),
   winRate: formatWinRate(player.wins, player.games),
+  profile: player.profile,
   recentGames: player.recentGames,
 })
 
@@ -140,7 +143,7 @@ export function buildPlayerStats(
           player.points -= 1
         }
 
-        if (player.recentGames.length < 3) {
+        if (player.recentGames.length < 5) {
           player.recentGames.push({
             label: `${game.dateShort} vs ${team.opponent}`,
             result: didWin ? '+3' : '-1',

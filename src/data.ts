@@ -20,6 +20,14 @@ export type HistoryGame = {
   teamB: string[]
 }
 
+export type PlayerProfile = {
+  heightCm?: number
+  marketValueRp?: number
+  birthDate?: string
+  position?: string
+  dominantHand?: 'Kanan' | 'Kiri' | 'Keduanya'
+}
+
 export type PlayerCard = {
   id: string
   name: string
@@ -32,6 +40,7 @@ export type PlayerCard = {
   points: number
   coefficient: string
   winRate: string
+  profile?: PlayerProfile
   recentGames: Array<{
     label: string
     result: string
@@ -44,6 +53,7 @@ export type RosterPlayer = {
   isHiddenFromTeams?: boolean
   isRepeatable?: boolean
   isExcludedFromLeaderboard?: boolean
+  profile?: PlayerProfile
   seedStats?: {
     games: number
     wins: number
@@ -64,7 +74,12 @@ export const seedStatsMonth = '2026-06'
 
 export const playerDirectory: RosterPlayer[] = [
   { id: 'anonim', name: 'Anonim', isRepeatable: true, isExcludedFromLeaderboard: true },
-  { id: 'kevin', name: 'Kevin', seedStats: { games: 12, wins: 9, losses: 3, points: 24 } },
+  {
+    id: 'kevin',
+    name: 'Kevin',
+    profile: { heightCm: 188, marketValueRp: 125000000, birthDate: '2002-03-18', position: 'Small Forward', dominantHand: 'Kanan' },
+    seedStats: { games: 12, wins: 9, losses: 3, points: 24 },
+  },
   { id: 'ko-giri', name: 'Ko Giri', seedStats: { games: 10, wins: 8, losses: 2, points: 22 } },
   { id: 'ko-anton', name: 'Ko Anton', seedStats: { games: 10, wins: 7, losses: 3, points: 18 } },
   { id: 'fandi', name: 'Fandi', seedStats: { games: 14, wins: 8, losses: 6, points: 18 } },
@@ -130,6 +145,7 @@ export function reconcileRosterSeed(rosterPlayers: RosterPlayer[]) {
       name: storedPlayer.name === legacySeedNames[seededPlayer.id] ? seededPlayer.name : storedPlayer.name,
       isRepeatable: seededPlayer.isRepeatable,
       isExcludedFromLeaderboard: seededPlayer.isExcludedFromLeaderboard,
+      profile: seededPlayer.profile,
       seedStats: seededPlayer.seedStats,
     }
   })

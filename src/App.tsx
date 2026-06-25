@@ -1709,7 +1709,7 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
   }
 
   return (
-    <section className="grid gap-4 md:max-w-3xl">
+    <section className="grid gap-4 md:max-w-none">
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input className="h-12 pl-10" value={playerQuery} placeholder="Cari atau tambah pemain..." onChange={(event) => onSearchChange(event.target.value)} />
@@ -1718,15 +1718,28 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
         <PlusIcon data-icon="inline-start" />
         Tambah Pemain
       </Button>
-      <div className="grid gap-3 md:grid-cols-2 md:items-start">
-        <Card size="sm" className="rounded-3xl shadow-sm md:max-h-[calc(100dvh-13rem)] md:overflow-y-auto">
+      <div className="grid gap-4 md:grid-cols-[19rem_minmax(0,1fr)] md:items-start">
+        <Card size="sm" className="rounded-[1.75rem] border-primary/10 bg-white/80 shadow-sm md:max-h-[calc(100dvh-13rem)] md:overflow-y-auto dark:bg-card">
           <CardContent className="grid gap-2 md:pr-2">
+            <div className="mb-2 flex items-end justify-between border-b border-dashed border-primary/20 pb-3">
+              <h2 className="font-heading text-base font-black uppercase tracking-tight text-primary">Player List</h2>
+              <span className="text-xs font-medium text-muted-foreground">{players.length} pemain</span>
+            </div>
             {players.map((player, index) => (
-              <Button key={player.id} type="button" variant={selectedPlayerId === player.id ? 'default' : 'ghost'} className="h-auto min-h-12 justify-start rounded-2xl px-2 py-2 text-left" onClick={() => handleSelectPlayer(player.id)}>
+              <Button
+                key={player.id}
+                type="button"
+                variant="ghost"
+                className={cn(
+                  'h-auto min-h-14 justify-start rounded-[1.15rem] px-2.5 py-2.5 text-left hover:bg-primary/5',
+                  selectedPlayerId === player.id && 'bg-primary/10 text-foreground shadow-[inset_4px_0_0_var(--primary)] hover:bg-primary/10'
+                )}
+                onClick={() => handleSelectPlayer(player.id)}
+              >
                 <PlayerAvatar name={player.name} seed={index} />
-                <span className="grid">
-                  <strong className="text-sm font-medium">{player.name}</strong>
-                  <span className="text-xs opacity-80">{player.games} game - {player.winRate} menang</span>
+                <span className="grid min-w-0 flex-1">
+                  <strong className="truncate text-sm font-semibold">{player.name}</strong>
+                  <span className="truncate text-xs text-muted-foreground">{player.games} game · {player.winRate} menang</span>
                 </span>
               </Button>
             ))}
@@ -1743,6 +1756,36 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
       )}
     </section>
   )
+}
+
+function formatRupiah(value: number) {
+  return `Rp ${new Intl.NumberFormat('id-ID').format(value)}`
+}
+
+function parsePercent(value: string) {
+  return Number(value.replace('%', '')) || 0
+}
+
+function parseCoefficient(value: string) {
+  return value.startsWith('(') && value.endsWith(')') ? -Number(value.slice(1, -1)) : Number(value)
+}
+
+function clampProgress(value: number) {
+  return Math.max(4, Math.min(100, Math.round(value)))
+}
+
+function formatBirthDate(value: string | undefined) {
+  if (!value) return 'Belum diisi'
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return 'Belum diisi'
+  return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(year, month - 1, day))
+}
+
+function getMarketValue(player: PlayerCard) {
+  if (player.profile?.marketValueRp !== undefined) return player.profile.marketValueRp
+  const baseValue = 250_000
+  const performanceValue = player.wins * 75_000 + player.games * 20_000 + Math.max(player.points, 0) * 10_000
+  return Math.max(100_000, Math.round((baseValue + performanceValue) / 50_000) * 50_000)
 }
 
 function PlayerDetail({ player, onRenamePlayer, onSetPlayerTeamVisibility, onProtectedAction }: {
@@ -1796,11 +1839,38 @@ function PlayerDetail({ player, onRenamePlayer, onSetPlayerTeamVisibility, onPro
     onSetPlayerTeamVisibility(player.id, true)
   }
 
+  const coefficient = parseCoefficient(player.coefficient)
+  const performanceRows = [
+    { label: 'Games', value: player.games, progress: clampProgress((player.games / Math.max(16, player.games)) * 100) },
+    { label: 'Wins', value: player.wins, progress: clampProgress(player.games === 0 ? 0 : (player.wins / player.games) * 100) },
+    { label: 'Losses', value: player.losses, progress: clampProgress(player.games === 0 ? 0 : (player.losses / player.games) * 100), muted: true },
+    { label: 'Win Rate', value: player.winRate, progress: clampProgress(parsePercent(player.winRate)) },
+    { label: 'Points', value: player.points, progress: clampProgress((Math.max(player.points, 0) / Math.max(30, player.points)) * 100) },
+    { label: 'Koef', value: player.coefficient, progress: clampProgress(((coefficient + 1) / 3) * 100) },
+  ]
+  const bioRows = [
+    { label: 'Tinggi', value: player.profile?.heightCm ? `${player.profile.heightCm} cm` : 'Belum diisi' },
+    { label: 'Harga Pasar', value: formatRupiah(getMarketValue(player)) },
+    { label: 'Tanggal Lahir', value: formatBirthDate(player.profile?.birthDate) },
+    { label: 'Posisi', value: player.profile?.position ?? 'Belum diisi' },
+    { label: 'Tangan Dominan', value: player.profile?.dominantHand ?? 'Belum diisi' },
+  ]
+  const recentGames = player.recentGames.slice(0, 5)
+  const initials = player.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+
   return (
-    <Card size="sm" className="rounded-3xl shadow-sm">
-      <CardHeader className="grid-cols-[minmax(0,1fr)_auto]">
+    <Card size="sm" className="player-scout-card relative overflow-visible rounded-[2rem] border-[#e0cfad] bg-[#fff8ea] py-0 text-zinc-950 shadow-[0_22px_55px_rgba(36,24,12,0.18)]">
+      <div className="pointer-events-none absolute left-1/2 top-0 z-20 hidden h-12 w-44 -translate-x-1/2 -translate-y-5 rounded-b-3xl border border-zinc-900/20 bg-zinc-300 shadow-xl md:block" />
+      <div className="pointer-events-none absolute left-1/2 top-0 z-30 hidden size-8 -translate-x-1/2 -translate-y-7 rounded-full border-[6px] border-zinc-500 bg-zinc-100 md:block" />
+      <CardHeader className="relative grid-cols-[minmax(0,1fr)_auto] gap-5 px-4 pb-0 pt-5 md:px-8 md:pt-8">
         <div className="flex min-w-0 items-center gap-3">
-          <PlayerAvatar name={player.name} />
+          <div className="player-polaroid">
+            <div className="player-tape" />
+            <div className="player-portrait">
+              <div className="player-portrait-initials">{initials}</div>
+              <div className="player-portrait-brand">Biawak</div>
+            </div>
+          </div>
           {isEditingName ? (
             <form
               className="flex min-w-0 flex-1 items-center gap-2"
@@ -1828,9 +1898,14 @@ function PlayerDetail({ player, onRenamePlayer, onSetPlayerTeamVisibility, onPro
               </Button>
             </form>
           ) : (
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <CardTitle className="min-w-0 truncate">{player.name}</CardTitle>
-              {player.isHiddenFromTeams && <Badge variant="secondary">Disembunyikan</Badge>}
+            <div className="min-w-0 flex-1">
+              <div className="font-script text-[4rem] leading-[0.78] tracking-tight text-zinc-950 md:text-[5.25rem]">{player.name}</div>
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-black uppercase tracking-[0.12em] text-primary">
+                <span>{player.profile?.position ?? 'Posisi belum diisi'}</span>
+                <span className="text-zinc-300">/</span>
+                <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-primary" />{player.active ? 'Active' : 'Inactive'}</span>
+                {player.isHiddenFromTeams && <span className="text-destructive">/ Disembunyikan</span>}
+              </div>
             </div>
           )}
         </div>
@@ -1867,24 +1942,50 @@ function PlayerDetail({ player, onRenamePlayer, onSetPlayerTeamVisibility, onPro
           </CardAction>
         )}
       </CardHeader>
-      <CardContent className="grid gap-4">
-        <div className="grid grid-cols-3 gap-2">
-          <ScoreMetric label="Game" value={player.games} />
-          <ScoreMetric label="Menang" value={player.wins} tone="win" />
-          <ScoreMetric label="Kalah" value={player.losses} tone="loss" />
-          <ScoreMetric label="Poin" value={player.points} />
-          <ScoreMetric label="Koef" value={player.coefficient} />
-          <ScoreMetric label="Menang %" value={player.winRate} />
+      <CardContent className="relative grid gap-6 px-4 pb-5 pt-5 md:px-8 md:pb-8">
+        <div className="grid gap-3">
+          <h3 className="scout-section-title"><BarChartIcon className="size-4" />Performance Summary</h3>
+          <div className="grid gap-2.5">
+            {performanceRows.map((row) => (
+              <div key={row.label} className="grid grid-cols-[5.8rem_minmax(0,1fr)_3rem] items-center gap-3 text-sm md:grid-cols-[6.4rem_minmax(0,1fr)_3.25rem]">
+                <span className="truncate font-medium text-zinc-700">{row.label}</span>
+                <span className="h-2 overflow-hidden rounded-full bg-zinc-900/10">
+                  <span className={cn('block h-full rounded-full', row.muted ? 'bg-zinc-500' : 'bg-primary')} style={{ width: `${row.progress}%` }} />
+                </span>
+                <strong className="text-right font-heading text-sm font-black text-zinc-950">{row.value}</strong>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="grid gap-2 text-left">
-          <h3 className="text-sm font-semibold">Game Terakhir</h3>
-          {player.recentGames.length === 0 && <p className="text-xs text-muted-foreground">Belum ada game.</p>}
-          {player.recentGames.map((game) => (
-            <div key={game.label} className="flex justify-between gap-3 rounded-2xl bg-muted px-3 py-2 text-xs">
-              <span>{game.label}</span>
-              <strong className={game.result.startsWith('+') ? 'text-primary' : 'text-destructive'}>{game.result}</strong>
-            </div>
-          ))}
+        <div className="grid gap-6 border-t border-zinc-900/10 pt-5 md:grid-cols-[0.92fr_1.08fr] md:gap-8">
+          <div className="grid gap-3">
+            <h3 className="scout-section-title"><UserRound className="size-4" />Bio Pemain</h3>
+            <dl className="grid gap-2.5">
+              {bioRows.map((row) => (
+                <div key={row.label} className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-3 border-b border-dashed border-zinc-900/10 pb-2.5 last:border-b-0 last:pb-0">
+                  <dt className="rounded-md bg-primary/10 px-2.5 py-1.5 text-xs font-bold text-primary">{row.label}</dt>
+                  <dd className="min-w-0 truncate text-sm font-semibold text-zinc-900">{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          <div className="grid gap-3">
+            <h3 className="scout-section-title"><HistoryIcon className="size-4" />Game Terakhir</h3>
+            {recentGames.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-zinc-900/15 px-3 py-3 text-sm font-medium text-zinc-500">Belum ada game tercatat.</p>
+            ) : (
+              <ol className="grid gap-0">
+                {recentGames.map((game, index) => (
+                  <li key={game.label} className="grid grid-cols-[2.25rem_minmax(0,1fr)_2.5rem] items-center gap-3 border-b border-dashed border-zinc-900/10 py-2.5 text-sm last:border-b-0">
+                    <span className="font-heading text-xs font-black uppercase tracking-wide text-primary">G{index + 1}</span>
+                    <span className="min-w-0 truncate font-medium text-zinc-800">{game.label}</span>
+                    <strong className={cn('text-right font-heading text-sm font-black', game.result.startsWith('+') ? 'text-primary' : 'text-destructive')}>{game.result}</strong>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
         </div>
       </CardContent>
       <AlertDialog.Root open={isHideDialogOpen} onOpenChange={setIsHideDialogOpen}>
@@ -1964,7 +2065,7 @@ function PlayerDetailSheet({ open, player, onClose, onRenamePlayer, onSetPlayerT
   )
 }
 
-function ScoreMetric({ label, value, tone }: { label: string; value: string | number; tone?: 'win' | 'loss' }) {
+export function ScoreMetric({ label, value, tone }: { label: string; value: string | number; tone?: 'win' | 'loss' }) {
   const valueClassName = tone === 'win' ? 'text-primary' : tone === 'loss' ? 'text-destructive' : 'text-foreground'
 
   return (

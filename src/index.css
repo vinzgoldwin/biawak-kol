@@ -4,6 +4,7 @@
 @import "sonner/dist/styles.css";
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/dm-sans";
+@import "@fontsource/allura";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -82,6 +83,7 @@
 @theme inline {
   --font-sans: 'Inter Variable', sans-serif;
   --font-heading: 'DM Sans Variable', sans-serif;
+  --font-script: 'Allura', cursive;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -171,6 +173,14 @@
     transform: translateY(0);
   }
 
+  .player-scout-card {
+    background:
+      linear-gradient(0deg, rgb(0 0 0 / 0.025) 1px, transparent 1px),
+      radial-gradient(circle at 90% 12%, rgb(0 130 54 / 0.08), transparent 22rem),
+      #fff8ea;
+    background-size: 100% 2rem, auto, auto;
+  }
+
   .sheet-handle {
     box-shadow: 0 1px 0 rgb(255 255 255 / 0.72) inset, 0 8px 18px rgb(17 24 39 / 0.08);
     transition: width 220ms ease, background-color 220ms ease, transform 220ms ease;
@@ -179,6 +189,74 @@
   .player-sheet:hover .sheet-handle {
     width: 3.5rem;
     transform: translateY(-1px);
+  }
+
+  .player-polaroid {
+    position: relative;
+    width: 7rem;
+    flex-shrink: 0;
+    transform: rotate(-2deg);
+    border: 1px solid rgb(24 24 27 / 0.1);
+    background: white;
+    padding: 0.375rem;
+    box-shadow: 0 14px 28px rgb(31 25 16 / 0.18);
+  }
+
+  .player-tape {
+    position: absolute;
+    left: 50%;
+    top: -0.5rem;
+    width: 3.5rem;
+    height: 1.25rem;
+    transform: translateX(-50%) rotate(-4deg);
+    background: rgb(254 243 199 / 0.8);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.08);
+  }
+
+  .player-portrait {
+    display: grid;
+    aspect-ratio: 4 / 5;
+    place-items: center;
+    overflow: hidden;
+    background: linear-gradient(145deg, #005f35, #008236 48%, #0f3b2d);
+    color: white;
+    text-align: center;
+  }
+
+  .player-portrait-initials {
+    display: grid;
+    width: 3.5rem;
+    height: 3.5rem;
+    place-items: center;
+    border-radius: 9999px;
+    background: rgb(0 0 0 / 0.2);
+    font-family: var(--font-heading);
+    font-size: 1.25rem;
+    font-weight: 900;
+  }
+
+  .player-portrait-brand {
+    margin-top: 0.5rem;
+    font-family: var(--font-heading);
+    font-size: 0.62rem;
+    font-weight: 900;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgb(255 255 255 / 0.8);
+  }
+
+  .scout-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom: 1px dashed rgb(0 130 54 / 0.25);
+    padding-bottom: 0.5rem;
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    color: var(--primary);
   }
 
   .undo-toast {

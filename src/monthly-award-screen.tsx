@@ -20,7 +20,6 @@ type MonthOption = { value: string; label: string }
 type AwardStats = { games: number; wins: number; losses: number; winRate: string }
 type AwardSaveInput = Omit<UploadMonthlyAwardInput, 'accessCode'>
 type MvpPosterView = { month: string; playerName: string; imageUrl: string; stats: AwardStats }
-type ArchiveAwardItem = MvpPosterView & { isPreview: boolean }
 type ShareAction = 'copy' | 'download' | 'native-share'
 
 const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
@@ -85,12 +84,6 @@ function getRecentMonthOptions(baseOptions: MonthOption[], awards: MonthlyAward[
     .map(([value, label]) => ({ value, label }))
 }
 
-function shiftMonth(value: string, offset: number) {
-  const [year, month] = value.split('-').map(Number)
-  const date = new Date(year, month - 1 + offset, 1)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-}
-
 function createMvpImageFileName(view: MvpPosterView) {
   const playerSlug = view.playerName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'player'
   return `biawak-kol-mvp-${view.month}-${playerSlug}.png`
@@ -126,36 +119,13 @@ function downloadBlob(blob: Blob, fileName: string) {
   URL.revokeObjectURL(url)
 }
 
-function buildPreviewArchiveAwards(awards: MonthlyAward[], rosterPlayers: RosterPlayer[], historyGames: HistoryGame[]): ArchiveAwardItem[] {
-  const currentAward = awards[0]
-  if (!currentAward) return []
-
-  const fallbackImageUrl = getAwardImageUrl(currentAward)
-  const realArchiveByMonth = new Map(
-    awards.slice(1).map((award) => [
-      award.month,
-      { month: award.month, playerName: award.playerName, imageUrl: getAwardImageUrl(award), stats: getAwardStats(award, rosterPlayers, historyGames), isPreview: false },
-    ]),
-  )
-  const dummyNames = ['Ko Giri', 'Ko Anton', 'Fandi', 'AAL', 'Andes', 'Yanuar', 'Tommy', 'Syauli', 'Frans', 'BMT', 'Hengki']
-
-  return Array.from({ length: 11 }, (_, index) => {
-    const month = shiftMonth(currentAward.month, -(index + 1))
-    const games = 8 + (index % 5)
-    const wins = Math.max(4, games - 2 - (index % 3))
-    return realArchiveByMonth.get(month) ?? {
-      month,
-      playerName: dummyNames[index % dummyNames.length],
-      imageUrl: fallbackImageUrl,
-      stats: {
-        games,
-        wins,
-        losses: games - wins,
-        winRate: getWinRate(games, wins),
-      },
-      isPreview: true,
-    }
-  })
+function buildArchiveAwards(awards: MonthlyAward[], rosterPlayers: RosterPlayer[], historyGames: HistoryGame[]): MvpPosterView[] {
+  return awards.slice(1).map((award) => ({
+    month: award.month,
+    playerName: award.playerName,
+    imageUrl: getAwardImageUrl(award),
+    stats: getAwardStats(award, rosterPlayers, historyGames),
+  }))
 }
 
 function useObjectUrl(file: File | null) {
@@ -194,7 +164,7 @@ export function MonthlyAwardScreen({ awards, monthOptions, rosterPlayers, histor
   const currentAward = awards[0] ?? null
   const currentStats = currentAward ? getAwardStats(currentAward, rosterPlayers, historyGames) : null
   const currentMvpView = currentAward && currentStats ? { month: currentAward.month, playerName: currentAward.playerName, imageUrl: getAwardImageUrl(currentAward), stats: currentStats } : null
-  const archiveAwards = useMemo(() => buildPreviewArchiveAwards(awards, rosterPlayers, historyGames), [awards, historyGames, rosterPlayers])
+  const archiveAwards = useMemo(() => buildArchiveAwards(awards, rosterPlayers, historyGames), [awards, historyGames, rosterPlayers])
   const selectedArchiveAward = selectedMvpMonth ? archiveAwards.find((award) => award.month === selectedMvpMonth) ?? null : null
   const viewedMvp = selectedArchiveAward ?? currentMvpView
   const isViewingArchive = Boolean(selectedArchiveAward)
@@ -585,7 +555,7 @@ function MvpWallHeader() {
   )
 }
 
-function PreviousMvpWall({ awards, selectedMonth, onSelect }: { awards: ArchiveAwardItem[]; selectedMonth: string | null; onSelect: (month: string) => void }) {
+function PreviousMvpWall({ awards, selectedMonth, onSelect }: { awards: MvpPosterView[]; selectedMonth: string | null; onSelect: (month: string) => void }) {
   const hasArchive = awards.length > 0
 
   return (
@@ -621,7 +591,7 @@ function ComingSoonSlot() {
   )
 }
 
-function ArchiveAward({ award, isSelected, onSelect }: { award: ArchiveAwardItem; isSelected: boolean; onSelect: () => void }) {
+function ArchiveAward({ award, isSelected, onSelect }: { award: MvpPosterView; isSelected: boolean; onSelect: () => void }) {
   return (
     <button
       type="button"
