@@ -2128,7 +2128,6 @@ function PlayerDetail({ player, onUpdatePlayer, onUploadPlayerPhoto, onRemovePla
               Harga Pasar (Rp)
               <Input
                 type="number"
-                min={0}
                 step={1}
                 value={draftMarketValueRp ?? ''}
                 placeholder="125000000"
