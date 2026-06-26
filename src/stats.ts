@@ -89,6 +89,7 @@ const toLeaderboardRow = (player: PlayerCard, isQualified: boolean): Leaderboard
   points: player.points,
   coefficient: player.coefficient,
   winRate: player.winRate,
+  profile: player.profile,
 })
 
 const compareLeaderboardPlayers = (left: PlayerCard, right: PlayerCard) => (

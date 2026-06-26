@@ -9,6 +9,7 @@ export type LeaderboardRow = {
   points: number
   coefficient: string
   winRate: string
+  profile?: PlayerProfile
 }
 
 export type HistoryGame = {
@@ -26,6 +27,7 @@ export type PlayerProfile = {
   birthDate?: string
   position?: string
   dominantHand?: 'Kanan' | 'Kiri' | 'Keduanya'
+  profilePictureUrl?: string
 }
 
 export type PlayerCard = {
@@ -145,7 +147,7 @@ export function reconcileRosterSeed(rosterPlayers: RosterPlayer[]) {
       name: storedPlayer.name === legacySeedNames[seededPlayer.id] ? seededPlayer.name : storedPlayer.name,
       isRepeatable: seededPlayer.isRepeatable,
       isExcludedFromLeaderboard: seededPlayer.isExcludedFromLeaderboard,
-      profile: seededPlayer.profile,
+      profile: storedPlayer.profile ?? seededPlayer.profile,
       seedStats: seededPlayer.seedStats,
     }
   })

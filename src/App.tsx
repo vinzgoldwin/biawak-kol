@@ -5,14 +5,18 @@ import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { toBlob } from 'html-to-image'
 import { cn } from '@/lib/utils'
-import { Avatar as ShadAvatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar as ShadAvatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { DatePicker } from '@/components/ui/date-picker'
+import { DatePicker, DatePickerDob } from '@/components/ui/date-picker'
+import { Dialog, DialogCloseButton, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { FileUpload } from '@/components/ui/file-upload'
 import { Input } from '@/components/ui/input'
+import { NumberField, NumberFieldDecrement, NumberFieldGroup, NumberFieldIncrement, NumberFieldInput } from '@/components/ui/number-field'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { PlayerPhotoCropper } from '@/components/player/PlayerPhotoCropper'
 import {
   historySeed,
   navItems,
@@ -23,6 +27,7 @@ import {
   type LeaderboardRow,
   type NavKey,
   type PlayerCard,
+  type PlayerProfile,
   type RosterPlayer,
 } from './data'
 import { ArrowLeftRight, EllipsisVertical, EyeIcon, EyeOff, GripVertical, NotebookPen, UserRound, X } from 'lucide-react'
@@ -43,6 +48,7 @@ import {
 } from './icons'
 import { fetchSharedState, saveSharedState, SharedStateError, type SharedState } from './remote-state'
 import { fetchMonthlyAwards, isAwardAccessError, uploadMonthlyAward, type MonthlyAward, type UploadMonthlyAwardInput } from './remote-awards'
+import { uploadPlayerImage, deletePlayerImage } from './remote-player-image'
 import { MonthlyAwardScreen } from './monthly-award-screen'
 import { buildDashboardSummary, buildLeaderboard, buildPlayerStats, getMinimumQualifiedGames, type SummaryStat } from './stats'
 
@@ -508,6 +514,9 @@ function App() {
     () => historyGames.filter((game) => toGameMonthValue(game.dateLabel) === selectedMonth),
     [historyGames, selectedMonth],
   )
+  const playerAvatarUrlsByName = useMemo(() => (
+    new Map(computedPlayers.map((player) => [player.name, player.profile?.profilePictureUrl]))
+  ), [computedPlayers])
 
   const assignedPlayers = useMemo(
     () => new Set([...recordState.teamA, ...recordState.teamB]),
@@ -745,38 +754,68 @@ function App() {
     runProtectedAction('Tambah Pemain', addPlayer)
   }
 
-  const renamePlayer = async (playerId: string, nextName: string) => {
+  const updatePlayer = async (playerId: string, nextName: string, nextProfile: Partial<PlayerProfile>) => {
     const trimmed = nextName.trim()
     if (!trimmed || isSyncing) return false
 
     const currentPlayer = rosterPlayers.find((player) => player.id === playerId)
     if (!currentPlayer) return false
 
-    const currentName = currentPlayer.name
-    if (currentName === trimmed) return true
-
-    const duplicatePlayer = rosterPlayers.some((player) => (
-      player.id !== playerId && player.name.toLowerCase() === trimmed.toLowerCase()
-    ))
-    if (duplicatePlayer) {
-      toast.error('Nama pemain sudah ada.', { duration: 4000 })
-      return false
+    const nameChanged = currentPlayer.name !== trimmed
+    if (nameChanged) {
+      const duplicatePlayer = rosterPlayers.some((player) => (
+        player.id !== playerId && player.name.toLowerCase() === trimmed.toLowerCase()
+      ))
+      if (duplicatePlayer) {
+        toast.error('Nama pemain sudah ada.', { duration: 4000 })
+        return false
+      }
     }
 
-    const renameTeamPlayer = (name: string) => (name === currentName ? trimmed : name)
+    const renameTeamPlayer = (name: string) => (name === currentPlayer.name ? trimmed : name)
     const nextRosterPlayers = rosterPlayers.map((player) => (
-      player.id === playerId ? { ...player, name: trimmed } : player
+      player.id === playerId
+        ? { ...player, name: trimmed, profile: { ...player.profile, ...nextProfile } }
+        : player
     ))
-    const nextHistoryGames = historyGames.map((game) => ({
-      ...game,
-      teamA: game.teamA.map(renameTeamPlayer),
-      teamB: game.teamB.map(renameTeamPlayer),
-    }))
+    const nextHistoryGames = nameChanged
+      ? historyGames.map((game) => ({
+          ...game,
+          teamA: game.teamA.map(renameTeamPlayer),
+          teamB: game.teamB.map(renameTeamPlayer),
+        }))
+      : historyGames
 
     return (await persistSharedState(nextHistoryGames, nextRosterPlayers)) !== null
   }
 
-  const runRenamePlayer = (playerId: string, nextName: string) => renamePlayer(playerId, nextName)
+  const runUpdatePlayer = (playerId: string, nextName: string, nextProfile: Partial<PlayerProfile>) => updatePlayer(playerId, nextName, nextProfile)
+
+  const uploadPlayerPhoto = async (playerId: string, photo: File) => {
+    const password = getStoredProtectedPassword()
+    if (!password) return null
+
+    try {
+      const result = await uploadPlayerImage({ password, playerId, photo })
+      return result.imageUrl
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Gagal upload foto profil.', { duration: 5000 })
+      return null
+    }
+  }
+
+  const removePlayerPhoto = async (playerId: string) => {
+    const password = getStoredProtectedPassword()
+    if (!password) return false
+
+    try {
+      await deletePlayerImage({ password, playerId })
+      return true
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Gagal menghapus foto profil.', { duration: 5000 })
+      return false
+    }
+  }
 
   const setPlayerTeamVisibility = async (playerId: string, isHiddenFromTeams: boolean) => {
     if (isSyncing) return false
@@ -862,6 +901,7 @@ function App() {
               availablePlayers={availablePlayers}
               playerMatchCounts={playerMatchCounts}
               reservePlayerNames={reservePlayerNames}
+              avatarUrlsByName={playerAvatarUrlsByName}
               editingGameId={editingGameId}
               teamsFull={teamsFull}
               canSave={canSave && !isSyncing}
@@ -875,11 +915,12 @@ function App() {
             />
           )}
           {activeScreen === 'saved' && (
-            <SavedScreen recordState={recordState} onRecordAgain={openBlankRecorder} onViewLeaderboard={() => setActiveScreen('dashboard')} />
+            <SavedScreen recordState={recordState} avatarUrlsByName={playerAvatarUrlsByName} onRecordAgain={openBlankRecorder} onViewLeaderboard={() => setActiveScreen('dashboard')} />
           )}
           {activeScreen === 'history' && (
             <HistoryScreen
               games={filteredHistoryGames}
+              avatarUrlsByName={playerAvatarUrlsByName}
               monthOptions={monthOptions}
               selectedMonth={selectedMonth}
               onMonthChange={setSelectedMonth}
@@ -897,7 +938,9 @@ function App() {
               onSearchChange={setPlayerQuery}
               onSelectPlayer={setSelectedPlayerId}
               onAddPlayer={runAddPlayer}
-              onRenamePlayer={runRenamePlayer}
+              onUpdatePlayer={runUpdatePlayer}
+              onUploadPlayerPhoto={uploadPlayerPhoto}
+              onRemovePlayerPhoto={removePlayerPhoto}
               onSetPlayerTeamVisibility={runSetPlayerTeamVisibility}
               onProtectedAction={runProtectedAction}
             />
@@ -1274,7 +1317,7 @@ function LeaderboardTable({ rows, ranked = false, animationKey }: { rows: Leader
               )}
               <TableCell>
                 <span className="flex items-center gap-2 font-medium">
-                  <PlayerAvatar name={player.name} seed={index} />
+                  <PlayerAvatar name={player.name} seed={index} imageUrl={player.profile?.profilePictureUrl} />
                   <span className="sm:hidden" title={player.name}>{mobileName}</span>
                   <span className="hidden sm:inline">{player.name}</span>
                 </span>
@@ -1297,11 +1340,12 @@ function LeaderboardTable({ rows, ranked = false, animationKey }: { rows: Leader
   )
 }
 
-function RecordScreen({ recordState, availablePlayers, playerMatchCounts, reservePlayerNames, editingGameId, teamsFull, canSave, onSearchChange, onDateChange, onAddPlayer, onRemovePlayer, onSwapTeams, onWinnerChange, onSave }: {
+function RecordScreen({ recordState, availablePlayers, playerMatchCounts, reservePlayerNames, avatarUrlsByName, editingGameId, teamsFull, canSave, onSearchChange, onDateChange, onAddPlayer, onRemovePlayer, onSwapTeams, onWinnerChange, onSave }: {
   recordState: RecordState
   availablePlayers: string[]
   playerMatchCounts: ReadonlyMap<string, number>
   reservePlayerNames: ReadonlySet<string>
+  avatarUrlsByName: ReadonlyMap<string, string | undefined>
   editingGameId: number | null
   teamsFull: boolean
   canSave: boolean
@@ -1407,7 +1451,7 @@ function RecordScreen({ recordState, availablePlayers, playerMatchCounts, reserv
                 aria-label={`Pilih ${player}`}
                 onClick={() => setTeamPickerPlayer(player)}
               >
-                <PlayerAvatar name={player} isReserve={reservePlayerNames.has(player)} />
+                <PlayerAvatar name={player} imageUrl={avatarUrlsByName.get(player)} isReserve={reservePlayerNames.has(player)} />
                 <strong className="min-w-0 flex-1 truncate text-left text-sm font-medium">{player}</strong>
               </Button>
             )
@@ -1421,7 +1465,7 @@ function RecordScreen({ recordState, availablePlayers, playerMatchCounts, reserv
       </section>
 
       <div className="grid gap-4 py-2 sm:grid-cols-[1fr_auto_1fr] sm:gap-5">
-        <TeamBox title="Tim A" tone="blue" players={recordState.teamA} reservePlayerNames={reservePlayerNames} teamSize={TEAM_SIZE} onRemove={(index) => onRemovePlayer(index, 'A')} />
+        <TeamBox title="Tim A" tone="blue" players={recordState.teamA} reservePlayerNames={reservePlayerNames} avatarUrlsByName={avatarUrlsByName} teamSize={TEAM_SIZE} onRemove={(index) => onRemovePlayer(index, 'A')} />
         <div className="relative hidden w-px bg-border sm:block">
           <Button
             type="button"
@@ -1441,7 +1485,7 @@ function RecordScreen({ recordState, availablePlayers, playerMatchCounts, reserv
           </Button>
           <div className="h-px flex-1 bg-border" />
         </div>
-        <TeamBox title="Tim B" tone="yellow" players={recordState.teamB} reservePlayerNames={reservePlayerNames} teamSize={TEAM_SIZE} onRemove={(index) => onRemovePlayer(index, 'B')} />
+        <TeamBox title="Tim B" tone="yellow" players={recordState.teamB} reservePlayerNames={reservePlayerNames} avatarUrlsByName={avatarUrlsByName} teamSize={TEAM_SIZE} onRemove={(index) => onRemovePlayer(index, 'B')} />
       </div>
 
       <div className="space-y-3">
@@ -1472,7 +1516,7 @@ function RecordScreen({ recordState, availablePlayers, playerMatchCounts, reserv
   )
 }
 
-function TeamBox({ title, tone, players, reservePlayerNames, teamSize, onRemove }: { title: string; tone: 'blue' | 'yellow'; players: string[]; reservePlayerNames: ReadonlySet<string>; teamSize: number; onRemove: (index: number) => void }) {
+function TeamBox({ title, tone, players, reservePlayerNames, avatarUrlsByName, teamSize, onRemove }: { title: string; tone: 'blue' | 'yellow'; players: string[]; reservePlayerNames: ReadonlySet<string>; avatarUrlsByName: ReadonlyMap<string, string | undefined>; teamSize: number; onRemove: (index: number) => void }) {
   const toneClassName = tone === 'blue' ? 'text-primary' : 'text-chart-3'
 
   return (
@@ -1488,7 +1532,7 @@ function TeamBox({ title, tone, players, reservePlayerNames, teamSize, onRemove 
         {players.map((player, index) => (
           <div key={`${player}-${index}`} className="flex min-h-11 items-center gap-2 border-b px-2.5 last:border-b-0">
             <GripVertical className="size-4 shrink-0 text-muted-foreground/60" aria-hidden="true" />
-            <PlayerAvatar name={player} seed={index} isReserve={reservePlayerNames.has(player)} />
+            <PlayerAvatar name={player} seed={index} imageUrl={avatarUrlsByName.get(player)} isReserve={reservePlayerNames.has(player)} />
             <span className="min-w-0 flex-1 truncate text-sm font-medium">{player}</span>
             <Button type="button" variant="ghost" size="icon-sm" className="rounded-lg text-muted-foreground hover:text-foreground" aria-label={`Hapus ${player} dari ${title}`} onClick={() => onRemove(index)}>
               <X />
@@ -1503,7 +1547,7 @@ function TeamBox({ title, tone, players, reservePlayerNames, teamSize, onRemove 
   )
 }
 
-function SavedScreen({ recordState, onRecordAgain, onViewLeaderboard }: { recordState: RecordState; onRecordAgain: () => void; onViewLeaderboard: () => void }) {
+function SavedScreen({ recordState, avatarUrlsByName, onRecordAgain, onViewLeaderboard }: { recordState: RecordState; avatarUrlsByName: ReadonlyMap<string, string | undefined>; onRecordAgain: () => void; onViewLeaderboard: () => void }) {
   const winningPlayers = recordState.winner === 'A' ? recordState.teamA : recordState.teamB
   const losingPlayers = recordState.winner === 'A' ? recordState.teamB : recordState.teamA
   return (
@@ -1512,9 +1556,9 @@ function SavedScreen({ recordState, onRecordAgain, onViewLeaderboard }: { record
       <h1 className="font-heading text-2xl font-semibold">Game tersimpan</h1>
       <p className="text-sm text-muted-foreground">Mantap! Statistik sudah diperbarui.</p>
       <div className="grid grid-cols-[1fr_2.5rem_1fr] items-center gap-2 text-left">
-        <SavedTeam label="Tim Menang" title={recordState.winner === 'A' ? 'Tim A' : 'Tim B'} players={winningPlayers} winner />
+        <SavedTeam label="Tim Menang" title={recordState.winner === 'A' ? 'Tim A' : 'Tim B'} players={winningPlayers} avatarUrlsByName={avatarUrlsByName} winner />
         <div className="text-center text-sm font-semibold">VS</div>
-        <SavedTeam label="Tim Kalah" title={recordState.winner === 'A' ? 'Tim B' : 'Tim A'} players={losingPlayers} />
+        <SavedTeam label="Tim Kalah" title={recordState.winner === 'A' ? 'Tim B' : 'Tim A'} players={losingPlayers} avatarUrlsByName={avatarUrlsByName} />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <ScoreCard label="Pemenang" value="+3" tone="win" />
@@ -1532,7 +1576,7 @@ function SavedScreen({ recordState, onRecordAgain, onViewLeaderboard }: { record
   )
 }
 
-function SavedTeam({ label, title, players, winner = false }: { label: string; title: string; players: string[]; winner?: boolean }) {
+function SavedTeam({ label, title, players, avatarUrlsByName, winner = false }: { label: string; title: string; players: string[]; avatarUrlsByName: ReadonlyMap<string, string | undefined>; winner?: boolean }) {
   return (
     <Card size="sm" className="min-h-44 rounded-3xl shadow-sm">
       <CardHeader>
@@ -1540,7 +1584,12 @@ function SavedTeam({ label, title, players, winner = false }: { label: string; t
         <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-1 text-xs font-medium">
-        {players.map((player, index) => <span key={`${player}-${index}`}>{player}</span>)}
+        {players.map((player, index) => (
+          <span key={`${player}-${index}`} className="flex items-center gap-2">
+            <PlayerAvatar name={player} seed={index} imageUrl={avatarUrlsByName.get(player)} />
+            <span className="min-w-0 truncate">{player}</span>
+          </span>
+        ))}
       </CardContent>
     </Card>
   )
@@ -1557,8 +1606,9 @@ function ScoreCard({ label, value, tone }: { label: string; value: string; tone:
   )
 }
 
-function HistoryScreen({ games, monthOptions, selectedMonth, onMonthChange, onEdit, onRecordMore, onRemove }: {
+function HistoryScreen({ games, avatarUrlsByName, monthOptions, selectedMonth, onMonthChange, onEdit, onRecordMore, onRemove }: {
   games: HistoryGame[]
+  avatarUrlsByName: ReadonlyMap<string, string | undefined>
   monthOptions: MonthOption[]
   selectedMonth: string
   onMonthChange: (month: string) => void
@@ -1646,9 +1696,9 @@ function HistoryScreen({ games, monthOptions, selectedMonth, onMonthChange, onEd
               </div>
 
               <div className="grid grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-center gap-3">
-                <HistoryTeam title="Tim A" tone="green" players={game.teamA} />
+                <HistoryTeam title="Tim A" tone="green" players={game.teamA} avatarUrlsByName={avatarUrlsByName} />
                 <span className="text-center font-heading text-base font-semibold">VS</span>
-                <HistoryTeam title="Tim B" tone="yellow" players={game.teamB} />
+                <HistoryTeam title="Tim B" tone="yellow" players={game.teamB} avatarUrlsByName={avatarUrlsByName} />
               </div>
             </div>
           </Card>
@@ -1680,16 +1730,23 @@ function HistoryScreen({ games, monthOptions, selectedMonth, onMonthChange, onEd
   )
 }
 
-function HistoryTeam({ title, tone, players }: { title: string; tone: 'green' | 'yellow'; players: string[] }) {
+function HistoryTeam({ title, tone, players, avatarUrlsByName }: { title: string; tone: 'green' | 'yellow'; players: string[]; avatarUrlsByName: ReadonlyMap<string, string | undefined> }) {
   return (
     <div className="min-w-0">
       <h3 className={tone === 'green' ? 'text-xs font-semibold text-primary' : 'text-xs font-semibold text-chart-3'}>{title}</h3>
-      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{players.join(', ')}</p>
+      <div className="mt-2 grid gap-1.5 text-xs font-medium text-muted-foreground">
+        {players.map((player, index) => (
+          <span key={`${player}-${index}`} className="flex min-w-0 items-center gap-1.5">
+            <PlayerAvatar name={player} seed={index} imageUrl={avatarUrlsByName.get(player)} />
+            <span className="min-w-0 truncate">{player}</span>
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
 
-function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId, onSearchChange, onSelectPlayer, onAddPlayer, onRenamePlayer, onSetPlayerTeamVisibility, onProtectedAction }: {
+function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId, onSearchChange, onSelectPlayer, onAddPlayer, onUpdatePlayer, onUploadPlayerPhoto, onRemovePlayerPhoto, onSetPlayerTeamVisibility, onProtectedAction }: {
   players: PlayerCard[]
   playerQuery: string
   selectedPlayer: PlayerCard | null
@@ -1697,7 +1754,9 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
   onSearchChange: (value: string) => void
   onSelectPlayer: (playerId: string) => void
   onAddPlayer: () => void
-  onRenamePlayer: (playerId: string, nextName: string) => Promise<boolean>
+  onUpdatePlayer: (playerId: string, nextName: string, nextProfile: Partial<PlayerProfile>) => Promise<boolean>
+  onUploadPlayerPhoto: (playerId: string, photo: File) => Promise<string | null>
+  onRemovePlayerPhoto: (playerId: string) => Promise<boolean>
   onSetPlayerTeamVisibility: (playerId: string, isHiddenFromTeams: boolean) => void
   onProtectedAction: (title: string, onAllowed: () => void | Promise<void>) => void
 }) {
@@ -1732,11 +1791,11 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
                 variant="ghost"
                 className={cn(
                   'h-auto min-h-14 justify-start rounded-[1.15rem] px-2.5 py-2.5 text-left hover:bg-primary/5',
-                  selectedPlayerId === player.id && 'bg-primary/10 text-foreground shadow-[inset_4px_0_0_var(--primary)] hover:bg-primary/10'
+                  selectedPlayerId === player.id && 'bg-primary/10 text-foreground hover:bg-primary/10'
                 )}
                 onClick={() => handleSelectPlayer(player.id)}
               >
-                <PlayerAvatar name={player.name} seed={index} />
+                <PlayerAvatar name={player.name} seed={index} imageUrl={player.profile?.profilePictureUrl} />
                 <span className="grid min-w-0 flex-1">
                   <strong className="truncate text-sm font-semibold">{player.name}</strong>
                   <span className="truncate text-xs text-muted-foreground">{player.games} game · {player.winRate} menang</span>
@@ -1747,12 +1806,12 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
         </Card>
         {selectedPlayer && (
           <div className="hidden md:block">
-            <PlayerDetail key={selectedPlayer.id} player={selectedPlayer} onRenamePlayer={onRenamePlayer} onSetPlayerTeamVisibility={onSetPlayerTeamVisibility} onProtectedAction={onProtectedAction} />
+            <PlayerDetail key={selectedPlayer.id} player={selectedPlayer} onUpdatePlayer={onUpdatePlayer} onUploadPlayerPhoto={onUploadPlayerPhoto} onRemovePlayerPhoto={onRemovePlayerPhoto} onSetPlayerTeamVisibility={onSetPlayerTeamVisibility} onProtectedAction={onProtectedAction} />
           </div>
         )}
       </div>
       {selectedPlayer && (
-        <PlayerDetailSheet open={isSheetOpen} player={selectedPlayer} onClose={() => setIsSheetOpen(false)} onRenamePlayer={onRenamePlayer} onSetPlayerTeamVisibility={onSetPlayerTeamVisibility} onProtectedAction={onProtectedAction} />
+        <PlayerDetailSheet open={isSheetOpen} player={selectedPlayer} onClose={() => setIsSheetOpen(false)} onUpdatePlayer={onUpdatePlayer} onUploadPlayerPhoto={onUploadPlayerPhoto} onRemovePlayerPhoto={onRemovePlayerPhoto} onSetPlayerTeamVisibility={onSetPlayerTeamVisibility} onProtectedAction={onProtectedAction} />
       )}
     </section>
   )
@@ -1781,48 +1840,96 @@ function formatBirthDate(value: string | undefined) {
   return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(year, month - 1, day))
 }
 
-function getMarketValue(player: PlayerCard) {
-  if (player.profile?.marketValueRp !== undefined) return player.profile.marketValueRp
-  const baseValue = 250_000
-  const performanceValue = player.wins * 75_000 + player.games * 20_000 + Math.max(player.points, 0) * 10_000
-  return Math.max(100_000, Math.round((baseValue + performanceValue) / 50_000) * 50_000)
-}
-
-function PlayerDetail({ player, onRenamePlayer, onSetPlayerTeamVisibility, onProtectedAction }: {
+function PlayerDetail({ player, onUpdatePlayer, onUploadPlayerPhoto, onRemovePlayerPhoto, onSetPlayerTeamVisibility, onProtectedAction }: {
   player: PlayerCard
-  onRenamePlayer: (playerId: string, nextName: string) => Promise<boolean>
+  onUpdatePlayer: (playerId: string, nextName: string, nextProfile: Partial<PlayerProfile>) => Promise<boolean>
+  onUploadPlayerPhoto: (playerId: string, photo: File) => Promise<string | null>
+  onRemovePlayerPhoto: (playerId: string) => Promise<boolean>
   onSetPlayerTeamVisibility: (playerId: string, isHiddenFromTeams: boolean) => void
   onProtectedAction: (title: string, onAllowed: () => void | Promise<void>) => void
 }) {
-  const [isEditingName, setIsEditingName] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [draftName, setDraftName] = useState(player.name)
+  const [draftHeightCm, setDraftHeightCm] = useState<number | null>(player.profile?.heightCm ?? null)
+  const [draftMarketValueRp, setDraftMarketValueRp] = useState<number | null>(player.profile?.marketValueRp ?? null)
+  const [draftBirthDate, setDraftBirthDate] = useState<string>(player.profile?.birthDate ?? '')
+  const [draftPhotoFile, setDraftPhotoFile] = useState<File | null>(null)
+  const [draftPhotoPreviewUrl, setDraftPhotoPreviewUrl] = useState<string | null>(null)
+  const [draftRemovePhoto, setDraftRemovePhoto] = useState(false)
+  const [photoToCrop, setPhotoToCrop] = useState<File | null>(null)
   const [isHideDialogOpen, setIsHideDialogOpen] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!isEditingName) return
+    if (!draftPhotoPreviewUrl) return undefined
+    return () => URL.revokeObjectURL(draftPhotoPreviewUrl)
+  }, [draftPhotoPreviewUrl])
 
-    window.requestAnimationFrame(() => {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    })
-  }, [isEditingName])
-
-  const startEditingName = () => {
-    onProtectedAction('Edit Nama Pemain', () => {
+  const startEditingProfile = () => {
+    onProtectedAction('Edit Pemain', () => {
       setDraftName(player.name)
-      setIsEditingName(true)
+      setDraftHeightCm(player.profile?.heightCm ?? null)
+      setDraftMarketValueRp(player.profile?.marketValueRp ?? null)
+      setDraftBirthDate(player.profile?.birthDate ?? '')
+      setDraftPhotoFile(null)
+      setDraftPhotoPreviewUrl(null)
+      setDraftRemovePhoto(false)
+      setPhotoToCrop(null)
+      setIsEditDialogOpen(true)
     })
   }
 
-  const saveName = async () => {
-    const saved = await onRenamePlayer(player.id, draftName)
-    if (saved) setIsEditingName(false)
+  const selectPhotoForCrop = (file: File | undefined) => {
+    if (!file) return
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Gunakan foto JPG, PNG, atau WebP.', { duration: 4000 })
+      return
+    }
+
+    setPhotoToCrop(new File([file], file.name, { type: file.type, lastModified: file.lastModified }))
   }
 
-  const cancelEditingName = () => {
-    setDraftName(player.name)
-    setIsEditingName(false)
+  const useCroppedPhoto = (file: File) => {
+    setDraftPhotoFile(file)
+    setDraftPhotoPreviewUrl(URL.createObjectURL(file))
+    setDraftRemovePhoto(false)
+    setPhotoToCrop(null)
+  }
+
+  const saveProfile = async (event: FormEvent) => {
+    event.preventDefault()
+
+    const trimmedName = draftName.trim()
+    if (!trimmedName) {
+      toast.error('Nama pemain tidak boleh kosong.', { duration: 4000 })
+      return
+    }
+
+    const nextProfile: Partial<PlayerProfile> = {
+      heightCm: draftHeightCm ?? undefined,
+      marketValueRp: draftMarketValueRp ?? undefined,
+      birthDate: draftBirthDate || undefined,
+    }
+
+    setIsSavingProfile(true)
+    if (draftPhotoFile) {
+      const imageUrl = await onUploadPlayerPhoto(player.id, draftPhotoFile)
+      if (!imageUrl) {
+        setIsSavingProfile(false)
+        return
+      }
+      nextProfile.profilePictureUrl = imageUrl
+    } else if (draftRemovePhoto) {
+      nextProfile.profilePictureUrl = undefined
+    }
+
+    const saved = await onUpdatePlayer(player.id, trimmedName, nextProfile)
+    if (saved && draftRemovePhoto && player.profile?.profilePictureUrl) {
+      void onRemovePlayerPhoto(player.id)
+    }
+    setIsSavingProfile(false)
+    if (saved) setIsEditDialogOpen(false)
   }
 
   const changeTeamVisibility = () => {
@@ -1850,10 +1957,8 @@ function PlayerDetail({ player, onRenamePlayer, onSetPlayerTeamVisibility, onPro
   ]
   const bioRows = [
     { label: 'Tinggi', value: player.profile?.heightCm ? `${player.profile.heightCm} cm` : 'Belum diisi' },
-    { label: 'Harga Pasar', value: formatRupiah(getMarketValue(player)) },
+    { label: 'Harga Pasar', value: player.profile?.marketValueRp !== undefined ? formatRupiah(player.profile.marketValueRp) : 'Belum diisi' },
     { label: 'Tanggal Lahir', value: formatBirthDate(player.profile?.birthDate) },
-    { label: 'Posisi', value: player.profile?.position ?? 'Belum diisi' },
-    { label: 'Tangan Dominan', value: player.profile?.dominantHand ?? 'Belum diisi' },
   ]
   const recentGames = player.recentGames.slice(0, 5)
   const initials = player.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
@@ -1867,80 +1972,55 @@ function PlayerDetail({ player, onRenamePlayer, onSetPlayerTeamVisibility, onPro
           <div className="player-polaroid">
             <div className="player-tape" />
             <div className="player-portrait">
-              <div className="player-portrait-initials">{initials}</div>
-              <div className="player-portrait-brand">Biawak</div>
+              {player.profile?.profilePictureUrl ? (
+                <img src={player.profile.profilePictureUrl} alt={player.name} className="player-portrait-photo" />
+              ) : (
+                <>
+                  <div className="player-portrait-initials">{initials}</div>
+                  <div className="player-portrait-brand">Biawak</div>
+                </>
+              )}
             </div>
           </div>
-          {isEditingName ? (
-            <form
-              className="flex min-w-0 flex-1 items-center gap-2"
-              onSubmit={(event) => {
-                event.preventDefault()
-                void saveName()
-              }}
-            >
-              <Input
-                ref={inputRef}
-                className="h-9 flex-1 rounded-2xl px-3 font-heading text-lg font-semibold"
-                value={draftName}
-                aria-label="Nama pemain"
-                onFocus={(event) => event.target.select()}
-                onChange={(event) => setDraftName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') cancelEditingName()
-                }}
-              />
-              <Button type="submit" size="icon-sm" aria-label="Simpan nama pemain">
-                <CheckIcon />
-              </Button>
-              <Button type="button" variant="outline" size="icon-sm" aria-label="Batal edit nama pemain" onClick={cancelEditingName}>
-                x
-              </Button>
-            </form>
-          ) : (
-            <div className="min-w-0 flex-1">
-              <div className="font-script text-[4rem] leading-[0.78] tracking-tight text-zinc-950 md:text-[5.25rem]">{player.name}</div>
+          <div className="min-w-0 flex-1">
+            <div className="font-script text-[4rem] leading-[0.78] tracking-tight text-zinc-950 md:text-[5.25rem]">{player.name}</div>
+            {player.isHiddenFromTeams && (
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-black uppercase tracking-[0.12em] text-primary">
-                <span>{player.profile?.position ?? 'Posisi belum diisi'}</span>
-                <span className="text-zinc-300">/</span>
-                <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-primary" />{player.active ? 'Active' : 'Inactive'}</span>
-                {player.isHiddenFromTeams && <span className="text-destructive">/ Disembunyikan</span>}
+                <span className="text-destructive">Disembunyikan</span>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-        {!isEditingName && (
-          <CardAction>
-            <Menu.Root>
-              <Menu.Trigger
-                className="inline-flex size-8 items-center justify-center rounded-2xl outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/30 data-[popup-open]:bg-muted"
-                aria-label={`Kelola ${player.name}`}
-              >
-                <EllipsisVertical className="size-4" />
-              </Menu.Trigger>
-              <Menu.Portal>
-                <Menu.Positioner side="bottom" align="end" sideOffset={6} className="z-[70] outline-none">
-                  <Menu.Popup className="min-w-52 rounded-xl border bg-popover p-1 text-sm text-popover-foreground shadow-lg outline-none">
-                    <Menu.Item className="flex cursor-default items-center gap-2 rounded-lg px-3 py-2 outline-none data-[highlighted]:bg-muted" onClick={startEditingName}>
-                      <PencilIcon className="size-4" />
-                      Edit
-                    </Menu.Item>
-                    <Menu.Item
-                      className={cn(
-                        'flex cursor-default items-center gap-2 rounded-lg px-3 py-2 outline-none data-[highlighted]:bg-muted',
-                        !player.isHiddenFromTeams && 'text-destructive data-[highlighted]:bg-destructive/10'
-                      )}
-                      onClick={changeTeamVisibility}
-                    >
-                      {player.isHiddenFromTeams ? <EyeIcon className="size-4" /> : <EyeOff className="size-4" />}
-                      {player.isHiddenFromTeams ? 'Tampilkan' : 'Sembunyikan'}
-                    </Menu.Item>
-                  </Menu.Popup>
-                </Menu.Positioner>
-              </Menu.Portal>
-            </Menu.Root>
-          </CardAction>
-        )}
+        <CardAction>
+          <Menu.Root>
+            <Menu.Trigger
+              className="inline-flex size-8 items-center justify-center rounded-2xl outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/30 data-[popup-open]:bg-muted"
+              aria-label={`Kelola ${player.name}`}
+            >
+              <EllipsisVertical className="size-4" />
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Positioner side="bottom" align="end" sideOffset={6} className="z-[70] outline-none">
+                <Menu.Popup className="min-w-52 rounded-xl border bg-popover p-1 text-sm text-popover-foreground shadow-lg outline-none">
+                  <Menu.Item className="flex cursor-default items-center gap-2 rounded-lg px-3 py-2 outline-none data-[highlighted]:bg-muted" onClick={startEditingProfile}>
+                    <PencilIcon className="size-4" />
+                    Edit
+                  </Menu.Item>
+                  <Menu.Item
+                    className={cn(
+                      'flex cursor-default items-center gap-2 rounded-lg px-3 py-2 outline-none data-[highlighted]:bg-muted',
+                      !player.isHiddenFromTeams && 'text-destructive data-[highlighted]:bg-destructive/10'
+                    )}
+                    onClick={changeTeamVisibility}
+                  >
+                    {player.isHiddenFromTeams ? <EyeIcon className="size-4" /> : <EyeOff className="size-4" />}
+                    {player.isHiddenFromTeams ? 'Tampilkan' : 'Sembunyikan'}
+                  </Menu.Item>
+                </Menu.Popup>
+              </Menu.Positioner>
+            </Menu.Portal>
+          </Menu.Root>
+        </CardAction>
       </CardHeader>
       <CardContent className="relative grid gap-6 px-4 pb-5 pt-5 md:px-8 md:pb-8">
         <div className="grid gap-3">
@@ -1957,7 +2037,7 @@ function PlayerDetail({ player, onRenamePlayer, onSetPlayerTeamVisibility, onPro
             ))}
           </div>
         </div>
-        <div className="grid gap-6 border-t border-zinc-900/10 pt-5 md:grid-cols-[0.92fr_1.08fr] md:gap-8">
+        <div className="grid gap-6 border-t border-zinc-900/10 pt-5 md:grid-cols-[0.92fr_1.08fr] md:items-start md:gap-8">
           <div className="grid gap-3">
             <h3 className="scout-section-title"><UserRound className="size-4" />Bio Pemain</h3>
             <dl className="grid gap-2.5">
@@ -1973,11 +2053,11 @@ function PlayerDetail({ player, onRenamePlayer, onSetPlayerTeamVisibility, onPro
           <div className="grid gap-3">
             <h3 className="scout-section-title"><HistoryIcon className="size-4" />Game Terakhir</h3>
             {recentGames.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-zinc-900/15 px-3 py-3 text-sm font-medium text-zinc-500">Belum ada game tercatat.</p>
+              <p className="text-sm font-medium text-zinc-500">Belum ada game tercatat.</p>
             ) : (
               <ol className="grid gap-0">
                 {recentGames.map((game, index) => (
-                  <li key={game.label} className="grid grid-cols-[2.25rem_minmax(0,1fr)_2.5rem] items-center gap-3 border-b border-dashed border-zinc-900/10 py-2.5 text-sm last:border-b-0">
+                  <li key={game.label} className="grid grid-cols-[2.25rem_minmax(0,1fr)_2.5rem] items-center gap-3 border-b border-dashed border-zinc-900/10 pb-2.5 text-sm last:border-b-0 last:pb-0">
                     <span className="font-heading text-xs font-black uppercase tracking-wide text-primary">G{index + 1}</span>
                     <span className="min-w-0 truncate font-medium text-zinc-800">{game.label}</span>
                     <strong className={cn('text-right font-heading text-sm font-black', game.result.startsWith('+') ? 'text-primary' : 'text-destructive')}>{game.result}</strong>
@@ -1988,6 +2068,101 @@ function PlayerDetail({ player, onRenamePlayer, onSetPlayerTeamVisibility, onPro
           </div>
         </div>
       </CardContent>
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-[430px] rounded-[2rem] p-6">
+          <form className="grid gap-5" onSubmit={saveProfile}>
+            <DialogHeader>
+              <DialogTitle className="text-2xl">Edit Pemain</DialogTitle>
+              <DialogDescription>Perbarui nama, foto profil, tinggi, harga pasar, dan tanggal lahir pemain.</DialogDescription>
+              <DialogCloseButton />
+            </DialogHeader>
+
+            <div className="grid gap-2 text-xs font-black uppercase tracking-[0.12em]">
+              Foto Profil
+              <FileUpload
+                accept="image/jpeg,image/png,image/webp"
+                title="Upload foto profil"
+                description="JPG, PNG, atau WebP. Foto akan dicrop lingkaran."
+                previewUrl={draftRemovePhoto ? null : draftPhotoPreviewUrl ?? player.profile?.profilePictureUrl ?? null}
+                previewAlt={`Foto profil ${player.name}`}
+                className="min-h-48 rounded-2xl"
+                onChange={(event) => {
+                  selectPhotoForCrop(event.target.files?.[0])
+                  event.currentTarget.value = ''
+                }}
+              />
+              {(player.profile?.profilePictureUrl || draftPhotoFile) && !draftRemovePhoto && (
+                <Button type="button" variant="outline" className="h-10 rounded-xl" onClick={() => {
+                  setDraftPhotoFile(null)
+                  setDraftPhotoPreviewUrl(null)
+                  setDraftRemovePhoto(true)
+                }}>
+                  Hapus foto profil
+                </Button>
+              )}
+            </div>
+
+            <label className="grid gap-2 text-xs font-black uppercase tracking-[0.12em]">
+              Nama
+              <Input
+                type="text"
+                value={draftName}
+                placeholder="Nama pemain"
+                className="h-12 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 text-base"
+                onChange={(event) => setDraftName(event.target.value)}
+              />
+            </label>
+
+            <label className="grid gap-2 text-xs font-black uppercase tracking-[0.12em]">
+              Tinggi (cm)
+              <NumberField min={0} step={1} value={draftHeightCm} onValueChange={(value) => setDraftHeightCm(value ?? null)}>
+                <NumberFieldGroup className="h-12 bg-background px-2">
+                  <NumberFieldDecrement className="size-8" />
+                  <NumberFieldInput />
+                  <NumberFieldIncrement className="size-8" />
+                </NumberFieldGroup>
+              </NumberField>
+            </label>
+
+            <label className="grid gap-2 text-xs font-black uppercase tracking-[0.12em]">
+              Harga Pasar (Rp)
+              <Input
+                type="number"
+                min={0}
+                step={1}
+                value={draftMarketValueRp ?? ''}
+                placeholder="125000000"
+                className="h-12 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 text-base"
+                onChange={(event) => {
+                  const raw = event.target.value
+                  setDraftMarketValueRp(raw === '' ? null : Number(raw))
+                }}
+              />
+            </label>
+
+            <label className="grid gap-2 text-xs font-black uppercase tracking-[0.12em]">
+              Tanggal Lahir
+              <DatePickerDob value={draftBirthDate} onChange={setDraftBirthDate} />
+            </label>
+
+            <DialogFooter>
+              <Button type="submit" className="h-12 w-full" disabled={isSavingProfile}>
+                {isSavingProfile ? 'Menyimpan...' : 'Simpan'}
+              </Button>
+              <Button type="button" variant="ghost" className="h-11" onClick={() => setIsEditDialogOpen(false)}>
+                Batal
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {photoToCrop && (
+        <PlayerPhotoCropper
+          file={photoToCrop}
+          onCancel={() => setPhotoToCrop(null)}
+          onCropped={useCroppedPhoto}
+        />
+      )}
       <AlertDialog.Root open={isHideDialogOpen} onOpenChange={setIsHideDialogOpen}>
         <AlertDialog.Portal>
           <AlertDialog.Backdrop className="fixed inset-0 z-[80] bg-background/70 backdrop-blur-sm" />
@@ -2013,11 +2188,13 @@ function PlayerDetail({ player, onRenamePlayer, onSetPlayerTeamVisibility, onPro
   )
 }
 
-function PlayerDetailSheet({ open, player, onClose, onRenamePlayer, onSetPlayerTeamVisibility, onProtectedAction }: {
+function PlayerDetailSheet({ open, player, onClose, onUpdatePlayer, onUploadPlayerPhoto, onRemovePlayerPhoto, onSetPlayerTeamVisibility, onProtectedAction }: {
   open: boolean
   player: PlayerCard
   onClose: () => void
-  onRenamePlayer: (playerId: string, nextName: string) => Promise<boolean>
+  onUpdatePlayer: (playerId: string, nextName: string, nextProfile: Partial<PlayerProfile>) => Promise<boolean>
+  onUploadPlayerPhoto: (playerId: string, photo: File) => Promise<string | null>
+  onRemovePlayerPhoto: (playerId: string) => Promise<boolean>
   onSetPlayerTeamVisibility: (playerId: string, isHiddenFromTeams: boolean) => void
   onProtectedAction: (title: string, onAllowed: () => void | Promise<void>) => void
 }) {
@@ -2058,7 +2235,7 @@ function PlayerDetailSheet({ open, player, onClose, onRenamePlayer, onSetPlayerT
           <div className="sheet-handle h-1.5 w-12 rounded-full bg-muted" />
         </button>
         <div className="overflow-y-auto p-4">
-          <PlayerDetail key={player.id} player={player} onRenamePlayer={onRenamePlayer} onSetPlayerTeamVisibility={onSetPlayerTeamVisibility} onProtectedAction={onProtectedAction} />
+          <PlayerDetail key={player.id} player={player} onUpdatePlayer={onUpdatePlayer} onUploadPlayerPhoto={onUploadPlayerPhoto} onRemovePlayerPhoto={onRemovePlayerPhoto} onSetPlayerTeamVisibility={onSetPlayerTeamVisibility} onProtectedAction={onProtectedAction} />
         </div>
       </div>
     </div>
@@ -2076,13 +2253,14 @@ export function ScoreMetric({ label, value, tone }: { label: string; value: stri
   )
 }
 
-function PlayerAvatar({ name, seed, isReserve = false }: { name: string; seed?: number; isReserve?: boolean }) {
+function PlayerAvatar({ name, seed, imageUrl, isReserve = false }: { name: string; seed?: number; imageUrl?: string; isReserve?: boolean }) {
   const initials = name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
   const tones = ['bg-primary text-primary-foreground', 'bg-chart-3 text-white', 'bg-chart-4 text-white', 'bg-chart-5 text-white', 'bg-foreground text-background']
   const toneSeed = seed ?? Array.from(name).reduce((total, character) => total + character.charCodeAt(0), 0)
 
   return (
     <ShadAvatar size="sm" className={isReserve ? 'bg-muted-foreground text-background' : tones[toneSeed % tones.length]}>
+      {imageUrl && <AvatarImage src={imageUrl} alt={name} />}
       <AvatarFallback className="bg-transparent text-[10px] font-semibold text-current">
         {isReserve ? <UserRound className="size-3.5" aria-hidden="true" /> : initials}
       </AvatarFallback>

@@ -4,13 +4,13 @@ import 'react-easy-crop/react-easy-crop.css'
 import { Button } from '@/components/ui/button'
 import { createCroppedImageBlob } from '@/lib/crop-image'
 
-type MvpPhotoCropperProps = {
+type PlayerPhotoCropperProps = {
   file: File
   onCancel: () => void
   onCropped: (file: File) => void
 }
 
-export function MvpPhotoCropper({ file, onCancel, onCropped }: MvpPhotoCropperProps) {
+export function PlayerPhotoCropper({ file, onCancel, onCropped }: PlayerPhotoCropperProps) {
   const [imageUrl] = useState(() => URL.createObjectURL(file))
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
@@ -23,8 +23,8 @@ export function MvpPhotoCropper({ file, onCancel, onCropped }: MvpPhotoCropperPr
     setIsProcessing(true)
     try {
       const croppedFile = await createCroppedImageBlob(imageUrl, croppedArea, {
-        fileName: file.name.replace(/\.[^.]+$/, '') + '-mvp.webp',
-        maxWidth: 1400,
+        fileName: file.name.replace(/\.[^.]+$/, '') + '-avatar.webp',
+        maxWidth: 512,
         mimeType: 'image/webp',
         quality: 0.86,
       })
@@ -41,21 +41,21 @@ export function MvpPhotoCropper({ file, onCancel, onCropped }: MvpPhotoCropperPr
   }
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-end bg-zinc-950/75 backdrop-blur-sm md:place-items-center" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[90] grid place-items-end bg-zinc-950/75 backdrop-blur-sm md:place-items-center" role="dialog" aria-modal="true">
       <div className="grid w-full max-w-[430px] gap-4 rounded-t-[2rem] border border-white/10 bg-zinc-950 p-5 text-white shadow-2xl md:rounded-[2rem]">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-300">Crop foto</p>
-          <p className="mt-1 text-sm text-white/60">Geser dan zoom foto.</p>
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-300">Crop foto profil</p>
+          <p className="mt-1 text-sm text-white/60">Geser dan zoom foto ke dalam lingkaran.</p>
         </div>
 
-        <div className="relative h-[26rem] overflow-hidden rounded-[1.5rem] bg-black">
+        <div className="relative h-[24rem] overflow-hidden rounded-[1.5rem] bg-black">
           {imageUrl && (
             <Cropper
               image={imageUrl}
               crop={crop}
               zoom={zoom}
-              aspect={4 / 5}
-              cropShape="rect"
+              aspect={1}
+              cropShape="round"
               showGrid={false}
               onCropChange={setCrop}
               onZoomChange={setZoom}
@@ -79,10 +79,10 @@ export function MvpPhotoCropper({ file, onCancel, onCropped }: MvpPhotoCropperPr
 
         <div className="grid grid-cols-2 gap-3">
           <Button type="button" variant="outline" className="h-12 border-white/20 bg-white/5 text-white hover:bg-white/10" onClick={cancelCrop}>
-            Cancel
+            Batal
           </Button>
           <Button type="button" className="h-12" onClick={finishCrop} disabled={isProcessing}>
-            {isProcessing ? 'Processing...' : 'Use Crop'}
+            {isProcessing ? 'Processing...' : 'Gunakan'}
           </Button>
         </div>
       </div>

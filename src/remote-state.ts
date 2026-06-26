@@ -49,6 +49,19 @@ function isHistoryGame(value: unknown): value is HistoryGame {
   )
 }
 
+function isPlayerProfile(value: unknown): boolean {
+  if (!isRecord(value)) return false
+
+  return (
+    (value.heightCm === undefined || typeof value.heightCm === 'number')
+    && (value.marketValueRp === undefined || typeof value.marketValueRp === 'number')
+    && (value.birthDate === undefined || typeof value.birthDate === 'string')
+    && (value.position === undefined || typeof value.position === 'string')
+    && (value.dominantHand === undefined || typeof value.dominantHand === 'string')
+    && (value.profilePictureUrl === undefined || typeof value.profilePictureUrl === 'string')
+  )
+}
+
 function isRosterPlayer(value: unknown): value is RosterPlayer {
   if (!isRecord(value)) return false
 
@@ -58,6 +71,7 @@ function isRosterPlayer(value: unknown): value is RosterPlayer {
     && (value.isHiddenFromTeams === undefined || typeof value.isHiddenFromTeams === 'boolean')
     && (value.isRepeatable === undefined || typeof value.isRepeatable === 'boolean')
     && (value.isExcludedFromLeaderboard === undefined || typeof value.isExcludedFromLeaderboard === 'boolean')
+    && (value.profile === undefined || isPlayerProfile(value.profile))
   )
 }
 

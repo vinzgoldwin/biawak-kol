@@ -75,4 +75,57 @@ function DatePicker({ id, value, onChange }: DatePickerProps) {
   )
 }
 
-export { DatePicker }
+type DatePickerDobProps = {
+  id?: string
+  value: string
+  onChange: (value: string) => void
+}
+
+function DatePickerDob({ id, value, onChange }: DatePickerDobProps) {
+  const [open, setOpen] = useState(false)
+  const date = parseDateValue(value)
+  const today = new Date()
+  const startMonth = new Date(today.getFullYear() - 100, 0, 1)
+  const endMonth = today
+
+  const selectDate = (selectedDate: Date | undefined) => {
+    if (!selectedDate) return
+
+    onChange(toDateValue(selectedDate))
+    setOpen(false)
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <Button
+            type="button"
+            id={id}
+            variant="outline"
+            data-empty={!date}
+            className="h-12 w-full justify-start rounded-2xl bg-background px-4 text-left font-normal shadow-none data-[empty=true]:text-muted-foreground"
+          />
+        }
+      >
+        <CalendarIcon data-icon="inline-start" />
+        <span className={cn(!date && "text-muted-foreground")}>
+          {date ? format(date, "PPP", { locale: indonesianLocale }) : "Pilih tanggal"}
+        </span>
+        <ChevronDown className="ml-auto size-4 text-muted-foreground" aria-hidden="true" />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-0">
+        <Calendar
+          mode="single"
+          captionLayout="dropdown"
+          startMonth={startMonth}
+          endMonth={endMonth}
+          selected={date}
+          onSelect={selectDate}
+        />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+export { DatePicker, DatePickerDob }

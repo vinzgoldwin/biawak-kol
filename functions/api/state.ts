@@ -11,12 +11,22 @@ type HistoryGame = {
   teamB: string[]
 }
 
+type PlayerProfile = {
+  heightCm?: number
+  marketValueRp?: number
+  birthDate?: string
+  position?: string
+  dominantHand?: string
+  profilePictureUrl?: string
+}
+
 type RosterPlayer = {
   id: string
   name: string
   isHiddenFromTeams?: boolean
   isRepeatable?: boolean
   isExcludedFromLeaderboard?: boolean
+  profile?: PlayerProfile
   seedStats?: {
     games: number
     wins: number
@@ -79,6 +89,19 @@ function isSeedStats(value: unknown): value is RosterPlayer['seedStats'] {
   )
 }
 
+function isPlayerProfile(value: unknown): value is PlayerProfile {
+  if (!isRecord(value)) return false
+
+  return (
+    (value.heightCm === undefined || typeof value.heightCm === 'number')
+    && (value.marketValueRp === undefined || typeof value.marketValueRp === 'number')
+    && (value.birthDate === undefined || typeof value.birthDate === 'string')
+    && (value.position === undefined || typeof value.position === 'string')
+    && (value.dominantHand === undefined || typeof value.dominantHand === 'string')
+    && (value.profilePictureUrl === undefined || typeof value.profilePictureUrl === 'string')
+  )
+}
+
 function isRosterPlayer(value: unknown): value is RosterPlayer {
   if (!isRecord(value)) return false
 
@@ -88,6 +111,7 @@ function isRosterPlayer(value: unknown): value is RosterPlayer {
     && (value.isHiddenFromTeams === undefined || typeof value.isHiddenFromTeams === 'boolean')
     && (value.isRepeatable === undefined || typeof value.isRepeatable === 'boolean')
     && (value.isExcludedFromLeaderboard === undefined || typeof value.isExcludedFromLeaderboard === 'boolean')
+    && (value.profile === undefined || isPlayerProfile(value.profile))
     && (value.seedStats === undefined || isSeedStats(value.seedStats))
   )
 }
