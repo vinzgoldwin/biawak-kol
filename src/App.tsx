@@ -50,7 +50,7 @@ import { fetchSharedState, saveSharedState, SharedStateError, type SharedState }
 import { fetchMonthlyAwards, isAwardAccessError, uploadMonthlyAward, type MonthlyAward, type UploadMonthlyAwardInput } from './remote-awards'
 import { uploadPlayerImage, deletePlayerImage } from './remote-player-image'
 import { MonthlyAwardScreen } from './monthly-award-screen'
-import { buildDashboardSummary, buildLeaderboard, buildPlayerStats, getMinimumQualifiedGames, type SummaryStat } from './stats'
+import { buildDashboardSummary, buildLeaderboard, buildPlayerStats, getMinimumQualifiedGames, isPlayerVisibleOnLeaderboard, type SummaryStat } from './stats'
 
 type Winner = 'A' | 'B'
 type PlayerSort = 'alphabetical' | 'matches'
@@ -1185,12 +1185,12 @@ function compareExportPlayers(left: PlayerCard, right: PlayerCard) {
 const EXPORT_MAX_ROWS = 50
 
 function buildExportRows(players: PlayerCard[]) {
-  const minimumGames = getMinimumQualifiedGames(players.filter((player) => !player.isExcludedFromLeaderboard))
+  const minimumGames = getMinimumQualifiedGames(players.filter(isPlayerVisibleOnLeaderboard))
   const qualified = players
-    .filter((player) => !player.isExcludedFromLeaderboard && player.games >= minimumGames && player.games > 0)
+    .filter((player) => isPlayerVisibleOnLeaderboard(player) && player.games >= minimumGames && player.games > 0)
     .sort(compareExportPlayers)
   const unqualified = players
-    .filter((player) => !player.isExcludedFromLeaderboard && player.games < minimumGames)
+    .filter((player) => isPlayerVisibleOnLeaderboard(player) && player.games < minimumGames)
     .sort((left, right) => {
       if (left.games === 0 && right.games > 0) return 1
       if (right.games === 0 && left.games > 0) return -1
@@ -1207,7 +1207,7 @@ function LeaderboardImageExport({ players, selectedMonth, exportRef }: {
   exportRef: RefObject<HTMLDivElement | null>
 }) {
   const exportRows = useMemo(() => buildExportRows(players), [players])
-  const minimumGames = getMinimumQualifiedGames(players.filter((player) => !player.isExcludedFromLeaderboard))
+  const minimumGames = getMinimumQualifiedGames(players.filter(isPlayerVisibleOnLeaderboard))
   const title = `KLASEMEN ${formatMonthLabel(selectedMonth).toUpperCase()} BIAWAK KOL GAMES`
 
   return (
@@ -2172,7 +2172,7 @@ function PlayerDetail({ player, onUpdatePlayer, onUploadPlayerPhoto, onRemovePla
                   Sembunyikan {player.name}?
                 </AlertDialog.Title>
                 <AlertDialog.Description className="text-sm text-muted-foreground">
-                  Pemain tidak akan muncul di pilihan tim. Riwayat game tetap tersimpan.
+                  Pemain tidak akan muncul di pilihan tim atau klasemen. Riwayat game tetap tersimpan.
                 </AlertDialog.Description>
               </div>
               <div className="grid grid-cols-2 gap-3">

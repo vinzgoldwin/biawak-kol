@@ -105,6 +105,10 @@ const sortByBestWinRate = (left: PlayerCard, right: PlayerCard) => (
   || compareLeaderboardPlayers(left, right)
 )
 
+export const isPlayerVisibleOnLeaderboard = (
+  player: Pick<PlayerCard, 'isHiddenFromTeams' | 'isExcludedFromLeaderboard'>,
+) => !player.isHiddenFromTeams && !player.isExcludedFromLeaderboard
+
 export function getMinimumQualifiedGames(players: Pick<PlayerCard, 'games'>[]) {
   return Math.ceil(Math.max(0, ...players.map((player) => player.games)) / 2)
 }
@@ -161,7 +165,7 @@ export function buildPlayerStats(
 
 export function buildLeaderboard(players: PlayerCard[]): LeaderboardData {
   const rankedPlayers = players
-    .filter((player) => !player.isExcludedFromLeaderboard && player.games > 0)
+    .filter((player) => isPlayerVisibleOnLeaderboard(player) && player.games > 0)
     .sort(compareLeaderboardPlayers)
   const minimumGames = getMinimumQualifiedGames(rankedPlayers)
   const qualifiedPlayers = rankedPlayers.filter((player) => player.games >= minimumGames)
@@ -179,7 +183,7 @@ export function buildLeaderboard(players: PlayerCard[]): LeaderboardData {
 }
 
 export function buildDashboardSummary(games: HistoryGame[], players: PlayerCard[], leaderboard: LeaderboardData): SummaryStat[] {
-  const activePlayers = players.filter((player) => !player.isExcludedFromLeaderboard && player.games > 0)
+  const activePlayers = players.filter((player) => isPlayerVisibleOnLeaderboard(player) && player.games > 0)
   const topPlayer = leaderboard.qualified[0] ?? leaderboard.unqualified[0]
   const bestWinRatePlayer = [...activePlayers]
     .filter((player) => leaderboard.qualified.length === 0 || player.games >= leaderboard.minimumGames)
