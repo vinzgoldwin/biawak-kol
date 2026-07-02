@@ -1,4 +1,4 @@
-import type { HistoryGame, RosterPlayer } from './data'
+import { migrateRosterPlayers, type HistoryGame, type RosterPlayer } from './data'
 
 export type SharedState = {
   version: number
@@ -56,8 +56,6 @@ function isPlayerProfile(value: unknown): boolean {
     (value.heightCm === undefined || typeof value.heightCm === 'number')
     && (value.marketValueRp === undefined || typeof value.marketValueRp === 'number')
     && (value.birthDate === undefined || typeof value.birthDate === 'string')
-    && (value.position === undefined || typeof value.position === 'string')
-    && (value.dominantHand === undefined || typeof value.dominantHand === 'string')
     && (value.profilePictureUrl === undefined || typeof value.profilePictureUrl === 'string')
   )
 }
@@ -88,6 +86,10 @@ export function isSharedState(value: unknown): value is SharedState {
   )
 }
 
+function migrateSharedState(state: SharedState): SharedState {
+  return { ...state, rosterPlayers: migrateRosterPlayers(state.rosterPlayers) }
+}
+
 async function readJsonResponse(response: Response) {
   try {
     return await response.json() as unknown
@@ -111,7 +113,7 @@ export async function fetchSharedState() {
   const payload = await readJsonResponse(response)
   if (!isSharedState(payload)) throw new SharedStateError('invalid-response', 'Shared storage response was not valid.')
 
-  return payload
+  return migrateSharedState(payload)
 }
 
 export async function saveSharedState(input: SaveSharedStateInput) {
@@ -124,7 +126,7 @@ export async function saveSharedState(input: SaveSharedStateInput) {
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(input),
+      body: JSON.stringify({ ...input, rosterPlayers: migrateRosterPlayers(input.rosterPlayers) }),
     })
   } catch {
     throw new SharedStateError('network', 'Could not reach shared storage.')
@@ -137,7 +139,9 @@ export async function saveSharedState(input: SaveSharedStateInput) {
   }
 
   if (response.status === 409) {
-    const latestState = isRecord(payload) && isSharedState(payload.latestState) ? payload.latestState : undefined
+    const latestState = isRecord(payload) && isSharedState(payload.latestState)
+      ? migrateSharedState(payload.latestState)
+      : undefined
     throw new SharedStateError('conflict', 'Data sudah berubah di perangkat lain.', latestState)
   }
 
@@ -147,5 +151,5 @@ export async function saveSharedState(input: SaveSharedStateInput) {
 
   if (!isSharedState(payload)) throw new SharedStateError('invalid-response', 'Shared storage response was not valid.')
 
-  return payload
+  return migrateSharedState(payload)
 }

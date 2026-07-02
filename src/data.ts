@@ -25,8 +25,6 @@ export type PlayerProfile = {
   heightCm?: number
   marketValueRp?: number
   birthDate?: string
-  position?: string
-  dominantHand?: 'Kanan' | 'Kiri' | 'Keduanya'
   profilePictureUrl?: string
 }
 
@@ -79,7 +77,7 @@ export const playerDirectory: RosterPlayer[] = [
   {
     id: 'kevin',
     name: 'Kevin',
-    profile: { heightCm: 188, marketValueRp: 125000000, birthDate: '2002-03-18', position: 'Small Forward', dominantHand: 'Kanan' },
+    profile: { heightCm: 188, marketValueRp: 125000000, birthDate: '2002-03-18' },
     seedStats: { games: 12, wins: 9, losses: 3, points: 24 },
   },
   { id: 'ko-giri', name: 'Ko Giri', seedStats: { games: 10, wins: 8, losses: 2, points: 22 } },
@@ -135,10 +133,11 @@ const legacySeedNames: Record<string, string> = {
 }
 
 export function reconcileRosterSeed(rosterPlayers: RosterPlayer[]) {
+  const migratedRosterPlayers = migrateRosterPlayers(rosterPlayers)
   const seededPlayersById = new Map(playerDirectory.map((player) => [player.id, player]))
-  const storedPlayerIds = new Set(rosterPlayers.map((player) => player.id))
+  const storedPlayerIds = new Set(migratedRosterPlayers.map((player) => player.id))
 
-  const storedPlayers = rosterPlayers.map((storedPlayer) => {
+  const storedPlayers = migratedRosterPlayers.map((storedPlayer) => {
     const seededPlayer = seededPlayersById.get(storedPlayer.id)
     if (!seededPlayer) return storedPlayer
 
@@ -154,6 +153,18 @@ export function reconcileRosterSeed(rosterPlayers: RosterPlayer[]) {
 
   const missingSeededPlayers = playerDirectory.filter((player) => !storedPlayerIds.has(player.id))
   return [...storedPlayers, ...missingSeededPlayers]
+}
+
+export function migrateRosterPlayers(rosterPlayers: RosterPlayer[]) {
+  return rosterPlayers.map((player) => {
+    if (player.profile === undefined) return player
+
+    const migratedProfile = { ...player.profile } as Record<string, unknown>
+    delete migratedProfile.position
+    delete migratedProfile.dominantHand
+
+    return { ...player, profile: migratedProfile as PlayerProfile }
+  })
 }
 
 export const historySeed: HistoryGame[] = []

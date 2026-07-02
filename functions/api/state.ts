@@ -15,8 +15,6 @@ type PlayerProfile = {
   heightCm?: number
   marketValueRp?: number
   birthDate?: string
-  position?: string
-  dominantHand?: string
   profilePictureUrl?: string
 }
 
@@ -96,8 +94,6 @@ function isPlayerProfile(value: unknown): value is PlayerProfile {
     (value.heightCm === undefined || typeof value.heightCm === 'number')
     && (value.marketValueRp === undefined || typeof value.marketValueRp === 'number')
     && (value.birthDate === undefined || typeof value.birthDate === 'string')
-    && (value.position === undefined || typeof value.position === 'string')
-    && (value.dominantHand === undefined || typeof value.dominantHand === 'string')
     && (value.profilePictureUrl === undefined || typeof value.profilePictureUrl === 'string')
   )
 }
@@ -129,16 +125,58 @@ function isSharedState(value: unknown): value is SharedState {
   )
 }
 
+function migrateRosterPlayers(rosterPlayers: RosterPlayer[]) {
+  let didMigrate = false
+  const migratedRosterPlayers = rosterPlayers.map((player) => {
+    if (
+      player.profile === undefined
+      || (!('position' in player.profile) && !('dominantHand' in player.profile))
+    ) {
+      return player
+    }
+
+    didMigrate = true
+    const migratedProfile = { ...player.profile } as Record<string, unknown>
+    delete migratedProfile.position
+    delete migratedProfile.dominantHand
+
+    return { ...player, profile: migratedProfile as PlayerProfile }
+  })
+
+  return { rosterPlayers: migratedRosterPlayers, didMigrate }
+}
+
+function migrateSharedState(state: SharedState) {
+  const { rosterPlayers, didMigrate } = migrateRosterPlayers(state.rosterPlayers)
+  return {
+    state: didMigrate ? { ...state, rosterPlayers } : state,
+    didMigrate,
+  }
+}
+
 async function readCurrentState(env: Env) {
   const storedValue = await env.BIAWAK_KOL_STATE.get(STATE_KEY)
   if (storedValue === null) return null
 
+  let parsedValue: unknown
   try {
-    const parsedValue: unknown = JSON.parse(storedValue)
-    return isSharedState(parsedValue) ? parsedValue : null
+    parsedValue = JSON.parse(storedValue)
   } catch {
     return null
   }
+
+  if (!isSharedState(parsedValue)) return null
+
+  const migrated = migrateSharedState(parsedValue)
+  if (migrated.didMigrate) {
+    try {
+      await env.BIAWAK_KOL_STATE.put(STATE_KEY, JSON.stringify(migrated.state))
+    } catch (error) {
+      console.error(JSON.stringify({ event: 'state_migration_write_failed', error: String(error) }))
+    }
+  }
+
+  return migrated.state
 }
 
 async function sha256(value: string) {
@@ -204,7 +242,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     version: currentVersion + 1,
     updatedAt: new Date().toISOString(),
     historyGames: payload.historyGames,
-    rosterPlayers: payload.rosterPlayers,
+    rosterPlayers: migrateRosterPlayers(payload.rosterPlayers).rosterPlayers,
   }
 
   await env.BIAWAK_KOL_STATE.put(STATE_KEY, JSON.stringify(nextState))
