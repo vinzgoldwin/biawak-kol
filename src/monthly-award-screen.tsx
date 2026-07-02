@@ -119,8 +119,8 @@ function downloadBlob(blob: Blob, fileName: string) {
   URL.revokeObjectURL(url)
 }
 
-function buildArchiveAwards(awards: MonthlyAward[], rosterPlayers: RosterPlayer[], historyGames: HistoryGame[]): MvpPosterView[] {
-  return awards.slice(1).map((award) => ({
+function buildMvpViews(awards: MonthlyAward[], rosterPlayers: RosterPlayer[], historyGames: HistoryGame[]): MvpPosterView[] {
+  return awards.map((award) => ({
     month: award.month,
     playerName: award.playerName,
     imageUrl: getAwardImageUrl(award),
@@ -164,10 +164,10 @@ export function MonthlyAwardScreen({ awards, monthOptions, rosterPlayers, histor
   const currentAward = awards[0] ?? null
   const currentStats = currentAward ? getAwardStats(currentAward, rosterPlayers, historyGames) : null
   const currentMvpView = currentAward && currentStats ? { month: currentAward.month, playerName: currentAward.playerName, imageUrl: getAwardImageUrl(currentAward), stats: currentStats } : null
-  const archiveAwards = useMemo(() => buildArchiveAwards(awards, rosterPlayers, historyGames), [awards, historyGames, rosterPlayers])
-  const selectedArchiveAward = selectedMvpMonth ? archiveAwards.find((award) => award.month === selectedMvpMonth) ?? null : null
-  const viewedMvp = selectedArchiveAward ?? currentMvpView
-  const isViewingArchive = Boolean(selectedArchiveAward)
+  const mvpViews = useMemo(() => buildMvpViews(awards, rosterPlayers, historyGames), [awards, historyGames, rosterPlayers])
+  const selectedMvp = selectedMvpMonth ? mvpViews.find((award) => award.month === selectedMvpMonth) ?? null : null
+  const viewedMvp = selectedMvp ?? currentMvpView
+  const isViewingArchive = Boolean(selectedMvp && selectedMvp.month !== currentMvpView?.month)
   const effectivePlayerId = playerId || players[0]?.id || ''
   const selectedPlayer = players.find((player) => player.id === effectivePlayerId) ?? null
   const formMonthOptions = useMemo(() => getRecentMonthOptions(monthOptions, awards), [awards, monthOptions])
@@ -317,20 +317,22 @@ export function MonthlyAwardScreen({ awards, monthOptions, rosterPlayers, histor
                   Share
                 </button>
               )}
-              {isViewingArchive && (
-                <button type="button" className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-white/80 px-5 py-2.5 text-primary shadow-sm transition hover:bg-primary/10" onClick={() => setSelectedMvpMonth(null)}>
-                  Back to Current MVP
+              {!isViewingArchive && (
+                <button type="button" className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-primary-foreground shadow-sm transition hover:bg-primary/90" onClick={() => setSheetOpen(true)}>
+                  <ImageIcon className="size-4" />
+                  Update MVP
                 </button>
               )}
-              <button type="button" className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-primary-foreground shadow-sm transition hover:bg-primary/90" onClick={() => setSheetOpen(true)}>
-                <ImageIcon className="size-4" />
-                Update MVP
-              </button>
             </div>
           </div>
         </div>
 
-        <PreviousMvpWall awards={archiveAwards} selectedMonth={selectedMvpMonth} onSelect={setSelectedMvpMonth} />
+        <MvpArchive
+          awards={mvpViews}
+          currentMonth={currentMvpView?.month ?? null}
+          selectedMonth={viewedMvp?.month ?? null}
+          onSelect={(month) => setSelectedMvpMonth(month === currentMvpView?.month ? null : month)}
+        />
       </div>
 
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
@@ -555,19 +557,32 @@ function MvpWallHeader() {
   )
 }
 
-function PreviousMvpWall({ awards, selectedMonth, onSelect }: { awards: MvpPosterView[]; selectedMonth: string | null; onSelect: (month: string) => void }) {
-  const hasArchive = awards.length > 0
+function MvpArchive({ awards, currentMonth, selectedMonth, onSelect }: {
+  awards: MvpPosterView[]
+  currentMonth: string | null
+  selectedMonth: string | null
+  onSelect: (month: string) => void
+}) {
+  const hasAwards = awards.length > 0
 
   return (
     <section className="grid w-full gap-4 pt-2 lg:h-[42rem] lg:grid-rows-[auto_minmax(0,1fr)] lg:rounded-[1.75rem] lg:border lg:border-emerald-900/10 lg:bg-white/75 lg:p-5 lg:shadow-[0_24px_70px_rgba(0,64,32,0.07)] lg:backdrop-blur">
       <div className="flex items-center justify-center gap-3 text-center lg:justify-start lg:text-left">
         <span className="text-primary">☆</span>
-        <h2 className="font-heading text-sm font-black uppercase tracking-[0.22em] text-foreground">Previous MVPs</h2>
+        <h2 className="font-heading text-sm font-black uppercase tracking-[0.22em] text-foreground">MVP Archive</h2>
       </div>
 
-      {hasArchive ? (
+      {hasAwards ? (
         <div className="-mx-4 flex w-[calc(100%+2rem)] snap-x scroll-pl-7 gap-6 overflow-x-auto px-7 pb-3 [scrollbar-width:none] sm:-mx-6 sm:w-[calc(100%+3rem)] sm:px-8 lg:mx-0 lg:grid lg:h-full lg:w-full lg:max-w-none lg:grid-cols-1 lg:content-start lg:gap-3 lg:overflow-y-auto lg:overflow-x-hidden lg:px-0 lg:pb-1 lg:pr-1 lg:[scrollbar-width:thin] [&::-webkit-scrollbar]:hidden lg:[&::-webkit-scrollbar]:block lg:[&::-webkit-scrollbar]:w-1.5 lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-emerald-900/20 lg:[&::-webkit-scrollbar-track]:bg-transparent">
-          {awards.map((award) => <ArchiveAward key={award.month} award={award} isSelected={selectedMonth === award.month} onSelect={() => onSelect(award.month)} />)}
+          {awards.map((award) => (
+            <MvpArchiveAward
+              key={award.month}
+              award={award}
+              isCurrent={currentMonth === award.month}
+              isSelected={selectedMonth === award.month}
+              onSelect={() => onSelect(award.month)}
+            />
+          ))}
         </div>
       ) : (
         <div className="-mx-4 flex w-[calc(100%+2rem)] snap-x scroll-pl-7 gap-4 overflow-x-auto px-7 pb-3 [scrollbar-width:none] sm:-mx-6 sm:w-[calc(100%+3rem)] sm:px-8 lg:mx-0 lg:grid lg:h-full lg:w-full lg:max-w-none lg:grid-cols-1 lg:content-start lg:gap-3 lg:overflow-y-auto lg:overflow-x-hidden lg:px-0 lg:pb-1 lg:pr-1 lg:[scrollbar-width:thin] [&::-webkit-scrollbar]:hidden lg:[&::-webkit-scrollbar]:block lg:[&::-webkit-scrollbar]:w-1.5 lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-emerald-900/20 lg:[&::-webkit-scrollbar-track]:bg-transparent">
@@ -591,7 +606,12 @@ function ComingSoonSlot() {
   )
 }
 
-function ArchiveAward({ award, isSelected, onSelect }: { award: MvpPosterView; isSelected: boolean; onSelect: () => void }) {
+function MvpArchiveAward({ award, isCurrent, isSelected, onSelect }: {
+  award: MvpPosterView
+  isCurrent: boolean
+  isSelected: boolean
+  onSelect: () => void
+}) {
   return (
     <button
       type="button"
@@ -610,7 +630,11 @@ function ArchiveAward({ award, isSelected, onSelect }: { award: MvpPosterView; i
       <div className="min-w-0 lg:grid lg:gap-0.5">
         <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground lg:mt-0">{formatMonthLabel(award.month)}</p>
         <p className="mt-1 truncate text-sm font-bold text-foreground md:text-base lg:mt-0">{award.playerName}</p>
-        {isSelected && <p className="mt-1 hidden text-[10px] font-black uppercase tracking-[0.14em] text-primary lg:block">Viewing</p>}
+        {(isCurrent || isSelected) && (
+          <p className="mt-1 hidden text-[10px] font-black uppercase tracking-[0.14em] text-primary lg:block">
+            {isCurrent ? 'Current' : 'Viewing'}
+          </p>
+        )}
       </div>
     </button>
   )
