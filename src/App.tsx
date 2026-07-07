@@ -1814,6 +1814,16 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
   onProtectedAction: (title: string, onAllowed: () => void | Promise<void>) => void
 }) {
   const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const [playerSort, setPlayerSort] = useState<PlayerSort>('alphabetical')
+  const sortedPlayers = useMemo(() => {
+    return [...players].sort((first, second) => {
+      const alphabeticalOrder = first.name.localeCompare(second.name, 'id', { sensitivity: 'base' })
+      if (playerSort === 'alphabetical') return alphabeticalOrder
+
+      const matchDifference = second.games - first.games
+      return matchDifference || alphabeticalOrder
+    })
+  }, [playerSort, players])
 
   const handleSelectPlayer = (playerId: string) => {
     onSelectPlayer(playerId)
@@ -1835,9 +1845,26 @@ function PlayersScreen({ players, playerQuery, selectedPlayer, selectedPlayerId,
           <CardContent className="grid gap-2 md:pr-2">
             <div className="mb-2 flex items-end justify-between border-b border-dashed border-primary/20 pb-3">
               <h2 className="font-heading text-base font-black uppercase tracking-tight text-primary">Player List</h2>
-              <span className="text-xs font-medium text-muted-foreground">{players.length} pemain</span>
+              <Select
+                value={playerSort}
+                onValueChange={(value) => {
+                  if (value === 'alphabetical' || value === 'matches') setPlayerSort(value)
+                }}
+                items={PLAYER_SORT_OPTIONS}
+              >
+                <SelectTrigger size="sm" className="w-24 border-border bg-background" aria-label="Urutkan player list">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="end" alignItemWithTrigger={false}>
+                  <SelectGroup>
+                    {PLAYER_SORT_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
-            {players.map((player, index) => (
+            {sortedPlayers.map((player, index) => (
               <Button
                 key={player.id}
                 type="button"
