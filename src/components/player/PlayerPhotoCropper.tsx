@@ -23,10 +23,11 @@ export function PlayerPhotoCropper({ file, onCancel, onCropped }: PlayerPhotoCro
     setIsProcessing(true)
     try {
       const croppedFile = await createCroppedImageBlob(imageUrl, croppedArea, {
-        fileName: file.name.replace(/\.[^.]+$/, '') + '-avatar.webp',
+        fileName: file.name.replace(/\.[^.]+$/, '') + '-avatar.jpg',
+        fallbackMimeType: 'image/jpeg',
         maxWidth: 512,
-        mimeType: 'image/webp',
-        quality: 0.86,
+        mimeType: 'image/jpeg',
+        quality: 0.88,
       })
       URL.revokeObjectURL(imageUrl)
       onCropped(croppedFile)
@@ -42,13 +43,13 @@ export function PlayerPhotoCropper({ file, onCancel, onCropped }: PlayerPhotoCro
 
   return (
     <div className="fixed inset-0 z-[90] grid place-items-end bg-zinc-950/75 backdrop-blur-sm md:place-items-center" role="dialog" aria-modal="true">
-      <div className="grid w-full max-w-[430px] gap-4 rounded-t-[2rem] border border-white/10 bg-zinc-950 p-5 text-white shadow-2xl md:rounded-[2rem]">
+      <div className="grid max-h-[100dvh] w-full max-w-[430px] gap-4 overflow-y-auto rounded-t-[2rem] border border-white/10 bg-zinc-950 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] text-white shadow-2xl md:max-h-[92dvh] md:rounded-[2rem]">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-300">Crop foto profil</p>
           <p className="mt-1 text-sm text-white/60">Geser dan zoom foto ke dalam lingkaran.</p>
         </div>
 
-        <div className="relative h-[24rem] overflow-hidden rounded-[1.5rem] bg-black">
+        <div className="relative h-[min(24rem,52dvh)] min-h-[18rem] overflow-hidden rounded-[1.5rem] bg-black">
           {imageUrl && (
             <Cropper
               image={imageUrl}

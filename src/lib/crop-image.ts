@@ -8,7 +8,8 @@ export type PixelCropArea = {
 type OutputOptions = {
   fileName?: string
   maxWidth?: number
-  mimeType?: 'image/webp' | 'image/jpeg'
+  mimeType?: 'image/webp' | 'image/jpeg' | 'image/png'
+  fallbackMimeType?: 'image/jpeg' | 'image/png'
   quality?: number
 }
 
@@ -36,16 +37,29 @@ export async function createCroppedImageBlob(imageSrc: string, crop: PixelCropAr
   context.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, 0, targetWidth, targetHeight)
 
   const mimeType = options.mimeType ?? 'image/webp'
+  const fallbackMimeType = options.fallbackMimeType ?? 'image/jpeg'
   const quality = options.quality ?? 0.86
 
   return new Promise<File>((resolve, reject) => {
+    const createFile = (blob: Blob) => {
+      const type = blob.type || mimeType
+      resolve(new File([blob], options.fileName ?? 'mvp-poster.webp', { type, lastModified: Date.now() }))
+    }
+
     canvas.toBlob((blob) => {
       if (!blob) {
-        reject(new Error('Crop foto gagal.'))
+        canvas.toBlob((fallbackBlob) => {
+          if (!fallbackBlob) {
+            reject(new Error('Crop foto gagal.'))
+            return
+          }
+
+          createFile(fallbackBlob)
+        }, fallbackMimeType, quality)
         return
       }
 
-      resolve(new File([blob], options.fileName ?? 'mvp-poster.webp', { type: mimeType }))
+      createFile(blob)
     }, mimeType, quality)
   })
 }

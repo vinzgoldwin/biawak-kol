@@ -429,7 +429,7 @@ export function MonthlyAwardScreen({ awards, monthOptions, rosterPlayers, histor
       )}
 
       {viewedMvp && (
-        <div aria-hidden="true" className="pointer-events-none fixed -left-[10000px] top-0 opacity-100">
+        <div aria-hidden="true" className="pointer-events-none fixed left-[calc(100vw+100px)] top-0 opacity-100">
           <MvpPosterExport ref={exportCardRef} view={viewedMvp} />
         </div>
       )}

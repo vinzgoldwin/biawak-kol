@@ -48,8 +48,9 @@ import {
 } from './icons'
 import { fetchSharedState, saveSharedState, SharedStateError, type SharedState } from './remote-state'
 import { fetchMonthlyAwards, isAwardAccessError, uploadMonthlyAward, type MonthlyAward, type UploadMonthlyAwardInput } from './remote-awards'
+import { fetchMonthlyAchievements, isAchievementAccessError, saveMonthlyAchievement, type MonthlyAchievement, type SaveMonthlyAchievementInput } from './remote-achievements'
 import { uploadPlayerImage, deletePlayerImage } from './remote-player-image'
-import { MonthlyAwardScreen } from './monthly-award-screen'
+import { AwardsScreen } from './awards-screen'
 import { buildDashboardSummary, buildLeaderboard, buildPlayerStats, getMinimumQualifiedGames, isPlayerVisibleOnLeaderboard, type SummaryStat } from './stats'
 
 type Winner = 'A' | 'B'
@@ -90,6 +91,7 @@ type PendingProtectedAction = {
 }
 
 type MonthlyAwardSaveInput = Omit<UploadMonthlyAwardInput, 'accessCode'>
+type MonthlyAchievementSaveInput = Omit<SaveMonthlyAchievementInput, 'accessCode'>
 
 const navIcon: Record<NavKey, IconComponent> = {
   dashboard: HomeIcon,
@@ -350,8 +352,10 @@ function App() {
   const [editingGameId, setEditingGameId] = useState<number | null>(null)
   const [pendingProtectedAction, setPendingProtectedAction] = useState<PendingProtectedAction | null>(null)
   const [monthlyAwards, setMonthlyAwards] = useState<MonthlyAward[]>([])
+  const [monthlyAchievements, setMonthlyAchievements] = useState<MonthlyAchievement[]>([])
   const [isCopyingImage, setIsCopyingImage] = useState(false)
   const [isSavingMonthlyAward, setIsSavingMonthlyAward] = useState(false)
+  const [isSavingMonthlyAchievement, setIsSavingMonthlyAchievement] = useState(false)
   const [remoteVersion, setRemoteVersion] = useState(0)
   const [isSyncing, setIsSyncing] = useState(false)
   const imageExportRef = useRef<HTMLDivElement>(null)
@@ -450,6 +454,25 @@ function App() {
     }
 
     void loadMonthlyAwards()
+
+    return () => {
+      shouldIgnore = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let shouldIgnore = false
+
+    async function loadMonthlyAchievements() {
+      try {
+        const achievements = await fetchMonthlyAchievements()
+        if (!shouldIgnore) setMonthlyAchievements(achievements)
+      } catch {
+        if (!shouldIgnore) toast.error('Achievements belum bisa dimuat.', { duration: 5000 })
+      }
+    }
+
+    void loadMonthlyAchievements()
 
     return () => {
       shouldIgnore = true
@@ -596,6 +619,33 @@ function App() {
   const runAwardSave = (input: MonthlyAwardSaveInput, onSuccess: () => void) => {
     runProtectedAction('Simpan MVP Bulan Ini', () => {
       void saveAward(input).then((saved) => {
+        if (saved) onSuccess()
+      })
+    })
+  }
+
+  const saveAchievement = (input: MonthlyAchievementSaveInput) => {
+    const accessCode = getStoredProtectedPassword()
+    if (!accessCode) return Promise.resolve(false)
+
+    setIsSavingMonthlyAchievement(true)
+    return saveMonthlyAchievement({ ...input, accessCode })
+      .then((achievements) => {
+        setMonthlyAchievements(achievements)
+        toast.success('Achievement added.', { duration: 3000 })
+        return true
+      })
+      .catch((error: unknown) => {
+        if (isAchievementAccessError(error)) clearProtectedAccess()
+        toast.error(error instanceof Error ? error.message : 'Achievement belum bisa disimpan.', { duration: 5000 })
+        return false
+      })
+      .finally(() => setIsSavingMonthlyAchievement(false))
+  }
+
+  const runAchievementSave = (input: MonthlyAchievementSaveInput, onSuccess: () => void) => {
+    runProtectedAction('Tambah Achievement', () => {
+      void saveAchievement(input).then((saved) => {
         if (saved) onSuccess()
       })
     })
@@ -886,13 +936,16 @@ function App() {
             />
           )}
           {activeScreen === 'mvp' && (
-            <MonthlyAwardScreen
+            <AwardsScreen
               awards={monthlyAwards}
+              achievements={monthlyAchievements}
               monthOptions={monthOptions}
               rosterPlayers={rosterPlayers}
               historyGames={historyGames}
-              isSaving={isSavingMonthlyAward}
-              onSave={runAwardSave}
+              isSavingAward={isSavingMonthlyAward}
+              isSavingAchievement={isSavingMonthlyAchievement}
+              onSaveAward={runAwardSave}
+              onSaveAchievement={runAchievementSave}
             />
           )}
           {activeScreen === 'record' && (
@@ -1888,6 +1941,7 @@ function PlayerDetail({ player, onUpdatePlayer, onUploadPlayerPhoto, onRemovePla
     }
 
     setPhotoToCrop(new File([file], file.name, { type: file.type, lastModified: file.lastModified }))
+    setIsEditDialogOpen(false)
   }
 
   const useCroppedPhoto = (file: File) => {
@@ -1895,6 +1949,12 @@ function PlayerDetail({ player, onUpdatePlayer, onUploadPlayerPhoto, onRemovePla
     setDraftPhotoPreviewUrl(URL.createObjectURL(file))
     setDraftRemovePhoto(false)
     setPhotoToCrop(null)
+    setIsEditDialogOpen(true)
+  }
+
+  const cancelPhotoCrop = () => {
+    setPhotoToCrop(null)
+    setIsEditDialogOpen(true)
   }
 
   const saveProfile = async (event: FormEvent) => {
@@ -1912,24 +1972,26 @@ function PlayerDetail({ player, onUpdatePlayer, onUploadPlayerPhoto, onRemovePla
       birthDate: draftBirthDate || undefined,
     }
 
-    setIsSavingProfile(true)
-    if (draftPhotoFile) {
-      const imageUrl = await onUploadPlayerPhoto(player.id, draftPhotoFile)
-      if (!imageUrl) {
-        setIsSavingProfile(false)
-        return
+    try {
+      setIsSavingProfile(true)
+      if (draftPhotoFile) {
+        const imageUrl = await onUploadPlayerPhoto(player.id, draftPhotoFile)
+        if (!imageUrl) return
+        nextProfile.profilePictureUrl = imageUrl
+      } else if (draftRemovePhoto) {
+        nextProfile.profilePictureUrl = undefined
       }
-      nextProfile.profilePictureUrl = imageUrl
-    } else if (draftRemovePhoto) {
-      nextProfile.profilePictureUrl = undefined
-    }
 
-    const saved = await onUpdatePlayer(player.id, trimmedName, nextProfile)
-    if (saved && draftRemovePhoto && player.profile?.profilePictureUrl) {
-      void onRemovePlayerPhoto(player.id)
+      const saved = await onUpdatePlayer(player.id, trimmedName, nextProfile)
+      if (saved && draftRemovePhoto && player.profile?.profilePictureUrl) {
+        void onRemovePlayerPhoto(player.id)
+      }
+      if (saved) setIsEditDialogOpen(false)
+    } catch {
+      toast.error('Profil pemain belum bisa disimpan.', { duration: 5000 })
+    } finally {
+      setIsSavingProfile(false)
     }
-    setIsSavingProfile(false)
-    if (saved) setIsEditDialogOpen(false)
   }
 
   const changeTeamVisibility = () => {
@@ -2068,7 +2130,7 @@ function PlayerDetail({ player, onUpdatePlayer, onUploadPlayerPhoto, onRemovePla
           </div>
         </div>
       </CardContent>
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Dialog open={isEditDialogOpen && photoToCrop === null} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-[430px] rounded-[2rem] p-6">
           <form className="grid gap-5" onSubmit={saveProfile}>
             <DialogHeader>
@@ -2158,7 +2220,7 @@ function PlayerDetail({ player, onUpdatePlayer, onUploadPlayerPhoto, onRemovePla
       {photoToCrop && (
         <PlayerPhotoCropper
           file={photoToCrop}
-          onCancel={() => setPhotoToCrop(null)}
+          onCancel={cancelPhotoCrop}
           onCropped={useCroppedPhoto}
         />
       )}
