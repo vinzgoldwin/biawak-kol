@@ -1,0 +1,239 @@
+{
+  "files": [
+    {
+      "file": "allura-latin-400-normal-4sUZKTf1.woff2",
+      "family": "Allura",
+      "rawFamily": "Allura",
+      "subfamily": "Regular",
+      "postscript": "Allura-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "allura-latin-400-normal-DcxZAN6k.woff",
+      "family": "Allura",
+      "rawFamily": "Allura",
+      "subfamily": "Regular",
+      "postscript": "Allura-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "allura-latin-ext-400-normal-CtccLdDz.woff2",
+      "family": "Allura",
+      "rawFamily": "Allura",
+      "subfamily": "Regular",
+      "postscript": "Allura-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "allura-latin-ext-400-normal-DLMC5cc8.woff",
+      "family": "Allura",
+      "rawFamily": "Allura",
+      "subfamily": "Regular",
+      "postscript": "Allura-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "allura-vietnamese-400-normal-CwDpdm6f.woff",
+      "family": "Allura",
+      "rawFamily": "Allura",
+      "subfamily": "Regular",
+      "postscript": "Allura-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "allura-vietnamese-400-normal-DAMfrWGX.woff2",
+      "family": "Allura",
+      "rawFamily": "Allura",
+      "subfamily": "Regular",
+      "postscript": "Allura-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "dm-sans-latin-ext-wght-normal-BOFOeGcA.woff2",
+      "family": "DM Sans 9pt",
+      "rawFamily": "DM Sans 9pt",
+      "subfamily": "Regular",
+      "postscript": "DMSans9pt-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "dm-sans-latin-wght-normal-Xz1IZZA0.woff2",
+      "family": "DM Sans 9pt",
+      "rawFamily": "DM Sans 9pt",
+      "subfamily": "Regular",
+      "postscript": "DMSans9pt-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2",
+      "family": "Inter",
+      "rawFamily": "Inter",
+      "subfamily": "Regular",
+      "postscript": "Inter-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "inter-cyrillic-wght-normal-DqGufNeO.woff2",
+      "family": "Inter",
+      "rawFamily": "Inter",
+      "subfamily": "Regular",
+      "postscript": "Inter-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "inter-greek-ext-wght-normal-DlzME5K_.woff2",
+      "family": "Inter",
+      "rawFamily": "Inter",
+      "subfamily": "Regular",
+      "postscript": "Inter-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "inter-greek-wght-normal-CkhJZR-_.woff2",
+      "family": "Inter",
+      "rawFamily": "Inter",
+      "subfamily": "Regular",
+      "postscript": "Inter-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "inter-latin-ext-wght-normal-DO1Apj_S.woff2",
+      "family": "Inter",
+      "rawFamily": "Inter",
+      "subfamily": "Regular",
+      "postscript": "Inter-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "inter-latin-wght-normal-Dx4kXJAl.woff2",
+      "family": "Inter",
+      "rawFamily": "Inter",
+      "subfamily": "Regular",
+      "postscript": "Inter-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    }
+  ],
+  "families": [
+    {
+      "family": "Allura",
+      "weights": [
+        400
+      ],
+      "variable": false,
+      "fileCount": 6,
+      "files": [
+        "allura-latin-400-normal-4sUZKTf1.woff2",
+        "allura-latin-400-normal-DcxZAN6k.woff",
+        "allura-latin-ext-400-normal-CtccLdDz.woff2",
+        "allura-latin-ext-400-normal-DLMC5cc8.woff",
+        "allura-vietnamese-400-normal-CwDpdm6f.woff",
+        "allura-vietnamese-400-normal-DAMfrWGX.woff2"
+      ]
+    },
+    {
+      "family": "DM Sans 9pt",
+      "weights": [
+        400
+      ],
+      "variable": true,
+      "fileCount": 2,
+      "files": [
+        "dm-sans-latin-ext-wght-normal-BOFOeGcA.woff2",
+        "dm-sans-latin-wght-normal-Xz1IZZA0.woff2"
+      ]
+    },
+    {
+      "family": "Inter",
+      "weights": [
+        400
+      ],
+      "variable": true,
+      "fileCount": 6,
+      "files": [
+        "inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2",
+        "inter-cyrillic-wght-normal-DqGufNeO.woff2",
+        "inter-greek-ext-wght-normal-DlzME5K_.woff2",
+        "inter-greek-wght-normal-CkhJZR-_.woff2",
+        "inter-latin-ext-wght-normal-DO1Apj_S.woff2",
+        "inter-latin-wght-normal-Dx4kXJAl.woff2"
+      ]
+    }
+  ],
+  "unidentified": [],
+  "meta": {
+    "generatedAt": "2026-07-07T14:42:21.666Z",
+    "tool": "fontkit"
+  }
+}

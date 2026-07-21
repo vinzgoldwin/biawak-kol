@@ -1,0 +1,392 @@
+[
+  {
+    "text": "One",
+    "start": 0.04,
+    "end": 0.17
+  },
+  {
+    "text": "badminton",
+    "start": 0.17,
+    "end": 0.68
+  },
+  {
+    "text": "group,",
+    "start": 0.68,
+    "end": 1.08
+  },
+  {
+    "text": "a",
+    "start": 1.15,
+    "end": 1.19
+  },
+  {
+    "text": "full",
+    "start": 1.19,
+    "end": 1.49
+  },
+  {
+    "text": "season",
+    "start": 1.49,
+    "end": 1.93
+  },
+  {
+    "text": "of",
+    "start": 1.94,
+    "end": 2.08
+  },
+  {
+    "text": "arguments.",
+    "start": 2.08,
+    "end": 2.8
+  },
+  {
+    "text": "Now",
+    "start": 2.85,
+    "end": 2.98
+  },
+  {
+    "text": "the",
+    "start": 2.98,
+    "end": 3.16
+  },
+  {
+    "text": "table",
+    "start": 3.16,
+    "end": 3.47
+  },
+  {
+    "text": "has",
+    "start": 3.47,
+    "end": 3.65
+  },
+  {
+    "text": "receipts.",
+    "start": 3.65,
+    "end": 4.37
+  },
+  {
+    "text": "Bioack",
+    "start": 4.43,
+    "end": 4.77
+  },
+  {
+    "text": "call",
+    "start": 4.77,
+    "end": 4.96
+  },
+  {
+    "text": "turns",
+    "start": 5.04,
+    "end": 5.36
+  },
+  {
+    "text": "every",
+    "start": 5.36,
+    "end": 5.57
+  },
+  {
+    "text": "game",
+    "start": 5.7,
+    "end": 5.98
+  },
+  {
+    "text": "into",
+    "start": 5.98,
+    "end": 6.16
+  },
+  {
+    "text": "a",
+    "start": 6.16,
+    "end": 6.22
+  },
+  {
+    "text": "live",
+    "start": 6.22,
+    "end": 6.46
+  },
+  {
+    "text": "July",
+    "start": 6.46,
+    "end": 6.7
+  },
+  {
+    "text": "leaderboard.",
+    "start": 6.7,
+    "end": 7.44
+  },
+  {
+    "text": "11",
+    "start": 7.49,
+    "end": 7.76
+  },
+  {
+    "text": "games",
+    "start": 7.76,
+    "end": 8.02
+  },
+  {
+    "text": "recorded,",
+    "start": 8.02,
+    "end": 8.52
+  },
+  {
+    "text": "25",
+    "start": 8.59,
+    "end": 8.92
+  },
+  {
+    "text": "players",
+    "start": 8.92,
+    "end": 9.33
+  },
+  {
+    "text": "tracked,",
+    "start": 9.36,
+    "end": 9.88
+  },
+  {
+    "text": "co-using",
+    "start": 9.93,
+    "end": 10.4
+  },
+  {
+    "text": "leads",
+    "start": 10.4,
+    "end": 10.73
+  },
+  {
+    "text": "qualified",
+    "start": 10.73,
+    "end": 11.33
+  },
+  {
+    "text": "win",
+    "start": 11.33,
+    "end": 11.53
+  },
+  {
+    "text": "rate",
+    "start": 11.53,
+    "end": 11.77
+  },
+  {
+    "text": "at",
+    "start": 11.8,
+    "end": 11.92
+  },
+  {
+    "text": "86%.",
+    "start": 11.92,
+    "end": 12.38
+  },
+  {
+    "text": "Record",
+    "start": 12.69,
+    "end": 12.99
+  },
+  {
+    "text": "a",
+    "start": 12.99,
+    "end": 13.05
+  },
+  {
+    "text": "match,",
+    "start": 13.05,
+    "end": 13.44
+  },
+  {
+    "text": "pick",
+    "start": 13.48,
+    "end": 13.62
+  },
+  {
+    "text": "the",
+    "start": 13.71,
+    "end": 13.72
+  },
+  {
+    "text": "team,",
+    "start": 13.79,
+    "end": 14
+  },
+  {
+    "text": "save",
+    "start": 14,
+    "end": 14.2
+  },
+  {
+    "text": "the",
+    "start": 14.2,
+    "end": 14.35
+  },
+  {
+    "text": "winner",
+    "start": 14.35,
+    "end": 14.68
+  },
+  {
+    "text": "and",
+    "start": 14.72,
+    "end": 14.82
+  },
+  {
+    "text": "the",
+    "start": 14.82,
+    "end": 14.96
+  },
+  {
+    "text": "standings",
+    "start": 14.96,
+    "end": 15.38
+  },
+  {
+    "text": "update",
+    "start": 15.38,
+    "end": 15.66
+  },
+  {
+    "text": "by",
+    "start": 15.75,
+    "end": 15.76
+  },
+  {
+    "text": "points,",
+    "start": 15.83,
+    "end": 16.28
+  },
+  {
+    "text": "coefficient",
+    "start": 16.32,
+    "end": 16.98
+  },
+  {
+    "text": "and",
+    "start": 16.98,
+    "end": 17.17
+  },
+  {
+    "text": "percentage.",
+    "start": 17.17,
+    "end": 18
+  },
+  {
+    "text": "The",
+    "start": 18.07,
+    "end": 18.25
+  },
+  {
+    "text": "same",
+    "start": 18.29,
+    "end": 18.58
+  },
+  {
+    "text": "data",
+    "start": 18.58,
+    "end": 18.9
+  },
+  {
+    "text": "powers",
+    "start": 18.9,
+    "end": 19.38
+  },
+  {
+    "text": "MVP",
+    "start": 19.38,
+    "end": 19.62
+  },
+  {
+    "text": "moments,",
+    "start": 19.62,
+    "end": 20.2
+  },
+  {
+    "text": "history",
+    "start": 20.25,
+    "end": 20.61
+  },
+  {
+    "text": "review",
+    "start": 20.65,
+    "end": 21.06
+  },
+  {
+    "text": "player",
+    "start": 21.06,
+    "end": 21.39
+  },
+  {
+    "text": "lists",
+    "start": 21.52,
+    "end": 21.8
+  },
+  {
+    "text": "and",
+    "start": 21.8,
+    "end": 21.92
+  },
+  {
+    "text": "shareable",
+    "start": 21.96,
+    "end": 22.4
+  },
+  {
+    "text": "award",
+    "start": 22.4,
+    "end": 22.7
+  },
+  {
+    "text": "visuals,",
+    "start": 23.04,
+    "end": 23.32
+  },
+  {
+    "text": "less",
+    "start": 23.37,
+    "end": 23.55
+  },
+  {
+    "text": "spreadsheet,",
+    "start": 23.59,
+    "end": 24.4
+  },
+  {
+    "text": "more",
+    "start": 24.47,
+    "end": 24.69
+  },
+  {
+    "text": "proof.",
+    "start": 24.69,
+    "end": 25.04
+  },
+  {
+    "text": "Bioack",
+    "start": 25.09,
+    "end": 25.44
+  },
+  {
+    "text": "call",
+    "start": 25.44,
+    "end": 25.71
+  },
+  {
+    "text": "keeps",
+    "start": 25.71,
+    "end": 26.02
+  },
+  {
+    "text": "the",
+    "start": 26.11,
+    "end": 26.23
+  },
+  {
+    "text": "games",
+    "start": 26.36,
+    "end": 26.59
+  },
+  {
+    "text": "honest.",
+    "start": 26.59,
+    "end": 27.26
+  }
+]

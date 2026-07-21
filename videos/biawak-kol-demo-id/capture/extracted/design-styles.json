@@ -1,0 +1,254 @@
+{
+  "typography": [
+    {
+      "role": "body-small",
+      "fontFamily": "Inter Variable",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "lineHeight": "16px",
+      "letterSpacing": "normal",
+      "color": "oklch(0.145 0 0)",
+      "sampleText": "NoPemainGMKPoinKoefPersentase1KYKo YusinKo Yusin761172.4386%"
+    },
+    {
+      "role": "label",
+      "fontFamily": "Inter Variable",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "16px",
+      "letterSpacing": "normal",
+      "color": "oklch(0.21 0.006 285.885)",
+      "sampleText": "86%"
+    }
+  ],
+  "spacing": {
+    "observed": [
+      4,
+      6,
+      8,
+      10,
+      12,
+      16,
+      24,
+      32
+    ],
+    "baseUnit": 8
+  },
+  "radius": [
+    "18px",
+    "22px",
+    "26px",
+    "3.35544e+07px"
+  ],
+  "shadows": [
+    {
+      "value": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.145 0 0 / 0.05) 0px 0px 0px 1px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px",
+      "count": 5
+    }
+  ],
+  "buttons": [
+    {
+      "label": "Beranda",
+      "background": "oklch(0.527 0.154 150.069)",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "oklch(0.982 0.018 155.826)",
+      "padding": "0px 12px 0px 10px",
+      "borderRadius": "18px",
+      "border": "1px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "fontSize": "14px",
+      "fontWeight": "500",
+      "height": "36px"
+    },
+    {
+      "label": "Juli 2026▼",
+      "background": "oklch(1 0 0)",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "oklch(0.145 0 0)",
+      "padding": "8px 12px",
+      "borderRadius": "22px",
+      "border": "1px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "fontSize": "14px",
+      "fontWeight": "500",
+      "height": "36px"
+    },
+    {
+      "label": "Catat Game Baru",
+      "background": "oklch(0.527 0.154 150.069)",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "oklch(0.982 0.018 155.826)",
+      "padding": "0px 12px 0px 10px",
+      "borderRadius": "26px",
+      "border": "1px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "fontSize": "14px",
+      "fontWeight": "500",
+      "height": "44px"
+    },
+    {
+      "label": "button",
+      "background": "oklch(1 0 0)",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "oklch(0.145 0 0)",
+      "padding": "0px",
+      "borderRadius": "26px",
+      "border": "1px solid oklch(0.922 0 0)",
+      "boxShadow": "none",
+      "fontSize": "14px",
+      "fontWeight": "500",
+      "height": "44px"
+    }
+  ],
+  "cards": [
+    {
+      "label": "card",
+      "background": "oklch(1 0 0)",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "oklch(0.145 0 0)",
+      "padding": "24px 20px",
+      "borderRadius": "0px",
+      "border": "",
+      "boxShadow": "none",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "height": "1080px"
+    },
+    {
+      "label": "card",
+      "background": "oklch(1 0 0)",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "oklch(0.145 0 0)",
+      "padding": "16px 0px",
+      "borderRadius": "22px",
+      "border": "0px solid oklch(0.922 0 0)",
+      "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.145 0 0 / 0.05) 0px 0px 0px 1px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "height": "91px"
+    }
+  ],
+  "nav": {
+    "label": "navigation",
+    "background": "transparent",
+    "backgroundImage": "",
+    "backdropFilter": "",
+    "color": "oklch(0.145 0 0)",
+    "padding": "0px",
+    "borderRadius": "0px",
+    "border": "0px solid oklch(0.922 0 0)",
+    "boxShadow": "none",
+    "fontSize": "16px",
+    "fontWeight": "400",
+    "height": "196px"
+  },
+  "chips": [
+    {
+      "label": "86%",
+      "background": "oklch(0.967 0.001 286.375)",
+      "color": "oklch(0.21 0.006 285.885)",
+      "padding": "2px 8px",
+      "borderRadius": "22px",
+      "border": "1px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "height": "20px"
+    },
+    {
+      "label": "100%",
+      "background": "oklch(0.936 0.032 17.717)",
+      "color": "oklch(0.396 0.141 25.723)",
+      "padding": "2px 8px",
+      "borderRadius": "22px",
+      "border": "1px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "height": "20px"
+    },
+    {
+      "label": "KY",
+      "background": "oklch(0.527 0.154 150.069)",
+      "color": "oklch(0.982 0.018 155.826)",
+      "padding": "0px",
+      "borderRadius": "3.35544e+07px",
+      "border": "0px solid oklch(0.922 0 0)",
+      "boxShadow": "none",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "height": "24px"
+    },
+    {
+      "label": "H",
+      "background": "oklch(0.476 0.114 61.907)",
+      "color": "#FFFFFF",
+      "padding": "0px",
+      "borderRadius": "3.35544e+07px",
+      "border": "0px solid oklch(0.922 0 0)",
+      "boxShadow": "none",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "height": "24px"
+    }
+  ],
+  "statCells": [],
+  "tabs": [
+    {
+      "label": "1",
+      "background": "transparent",
+      "color": "oklch(0.554 0.135 66.442)",
+      "padding": "0px 6px",
+      "borderRadius": "0px",
+      "border": "0px solid oklch(0.922 0 0)",
+      "boxShadow": "none",
+      "fontSize": "11px",
+      "fontWeight": "600",
+      "height": "28px"
+    },
+    {
+      "label": "2",
+      "background": "transparent",
+      "color": "oklch(0.552 0.016 285.938)",
+      "padding": "0px 6px",
+      "borderRadius": "0px",
+      "border": "0px solid oklch(0.922 0 0)",
+      "boxShadow": "none",
+      "fontSize": "11px",
+      "fontWeight": "600",
+      "height": "28px"
+    },
+    {
+      "label": "3",
+      "background": "transparent",
+      "color": "oklch(0.553 0.195 38.402)",
+      "padding": "0px 6px",
+      "borderRadius": "0px",
+      "border": "0px solid oklch(0.922 0 0)",
+      "boxShadow": "none",
+      "fontSize": "11px",
+      "fontWeight": "600",
+      "height": "28px"
+    },
+    {
+      "label": "4",
+      "background": "transparent",
+      "color": "oklch(0.145 0 0)",
+      "padding": "0px 6px",
+      "borderRadius": "0px",
+      "border": "0px solid oklch(0.922 0 0)",
+      "boxShadow": "none",
+      "fontSize": "11px",
+      "fontWeight": "600",
+      "height": "28px"
+    }
+  ],
+  "backgrounds": [],
+  "glass": []
+}

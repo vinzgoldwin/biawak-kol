@@ -1,0 +1,14 @@
+# Script
+
+One badminton group. A full season of arguments.
+Now the table has receipts.
+
+Biawak Kol turns every game into a live July leaderboard.
+Eleven games recorded. Twenty five players tracked. Ko Yusin leads qualified win rate at eighty six percent.
+
+Record a match, pick the teams, save the winner, and the standings update by points, coefficient, and percentage.
+
+The same data powers MVP moments, history review, player lists, and shareable award visuals.
+
+Less spreadsheet. More proof.
+Biawak Kol keeps the games honest.

@@ -48,9 +48,8 @@ import {
 } from './icons'
 import { fetchSharedState, saveSharedState, SharedStateError, type SharedState } from './remote-state'
 import { fetchMonthlyAwards, isAwardAccessError, uploadMonthlyAward, type MonthlyAward, type UploadMonthlyAwardInput } from './remote-awards'
-import { fetchMonthlyAchievements, isAchievementAccessError, saveMonthlyAchievement, type MonthlyAchievement, type SaveMonthlyAchievementInput } from './remote-achievements'
 import { uploadPlayerImage, deletePlayerImage } from './remote-player-image'
-import { AwardsScreen } from './awards-screen'
+import { MonthlyAwardScreen } from './monthly-award-screen'
 import { buildDashboardSummary, buildLeaderboard, buildPlayerStats, getMinimumQualifiedGames, isPlayerVisibleOnLeaderboard, type SummaryStat } from './stats'
 
 type Winner = 'A' | 'B'
@@ -91,7 +90,6 @@ type PendingProtectedAction = {
 }
 
 type MonthlyAwardSaveInput = Omit<UploadMonthlyAwardInput, 'accessCode'>
-type MonthlyAchievementSaveInput = Omit<SaveMonthlyAchievementInput, 'accessCode'>
 
 const navIcon: Record<NavKey, IconComponent> = {
   dashboard: HomeIcon,
@@ -352,10 +350,8 @@ function App() {
   const [editingGameId, setEditingGameId] = useState<number | null>(null)
   const [pendingProtectedAction, setPendingProtectedAction] = useState<PendingProtectedAction | null>(null)
   const [monthlyAwards, setMonthlyAwards] = useState<MonthlyAward[]>([])
-  const [monthlyAchievements, setMonthlyAchievements] = useState<MonthlyAchievement[]>([])
   const [isCopyingImage, setIsCopyingImage] = useState(false)
   const [isSavingMonthlyAward, setIsSavingMonthlyAward] = useState(false)
-  const [isSavingMonthlyAchievement, setIsSavingMonthlyAchievement] = useState(false)
   const [remoteVersion, setRemoteVersion] = useState(0)
   const [isSyncing, setIsSyncing] = useState(false)
   const imageExportRef = useRef<HTMLDivElement>(null)
@@ -454,25 +450,6 @@ function App() {
     }
 
     void loadMonthlyAwards()
-
-    return () => {
-      shouldIgnore = true
-    }
-  }, [])
-
-  useEffect(() => {
-    let shouldIgnore = false
-
-    async function loadMonthlyAchievements() {
-      try {
-        const achievements = await fetchMonthlyAchievements()
-        if (!shouldIgnore) setMonthlyAchievements(achievements)
-      } catch {
-        if (!shouldIgnore) toast.error('Achievements belum bisa dimuat.', { duration: 5000 })
-      }
-    }
-
-    void loadMonthlyAchievements()
 
     return () => {
       shouldIgnore = true
@@ -619,33 +596,6 @@ function App() {
   const runAwardSave = (input: MonthlyAwardSaveInput, onSuccess: () => void) => {
     runProtectedAction('Simpan MVP Bulan Ini', () => {
       void saveAward(input).then((saved) => {
-        if (saved) onSuccess()
-      })
-    })
-  }
-
-  const saveAchievement = (input: MonthlyAchievementSaveInput) => {
-    const accessCode = getStoredProtectedPassword()
-    if (!accessCode) return Promise.resolve(false)
-
-    setIsSavingMonthlyAchievement(true)
-    return saveMonthlyAchievement({ ...input, accessCode })
-      .then((achievements) => {
-        setMonthlyAchievements(achievements)
-        toast.success('Achievement added.', { duration: 3000 })
-        return true
-      })
-      .catch((error: unknown) => {
-        if (isAchievementAccessError(error)) clearProtectedAccess()
-        toast.error(error instanceof Error ? error.message : 'Achievement belum bisa disimpan.', { duration: 5000 })
-        return false
-      })
-      .finally(() => setIsSavingMonthlyAchievement(false))
-  }
-
-  const runAchievementSave = (input: MonthlyAchievementSaveInput, onSuccess: () => void) => {
-    runProtectedAction('Tambah Achievement', () => {
-      void saveAchievement(input).then((saved) => {
         if (saved) onSuccess()
       })
     })
@@ -936,16 +886,13 @@ function App() {
             />
           )}
           {activeScreen === 'mvp' && (
-            <AwardsScreen
+            <MonthlyAwardScreen
               awards={monthlyAwards}
-              achievements={monthlyAchievements}
               monthOptions={monthOptions}
               rosterPlayers={rosterPlayers}
               historyGames={historyGames}
-              isSavingAward={isSavingMonthlyAward}
-              isSavingAchievement={isSavingMonthlyAchievement}
-              onSaveAward={runAwardSave}
-              onSaveAchievement={runAchievementSave}
+              isSaving={isSavingMonthlyAward}
+              onSave={runAwardSave}
             />
           )}
           {activeScreen === 'record' && (
