@@ -551,7 +551,7 @@ function StatRailItem({ icon, isExport = false, label, value }: { icon: 'rate' |
 function MvpWallHeader() {
   return (
     <header className="grid gap-2">
-      <h1 className="font-heading text-4xl font-black leading-none tracking-tight text-primary lg:text-5xl">Raja Biawak</h1>
+      <h1 className="font-heading text-4xl font-black leading-none tracking-tight text-primary lg:text-5xl">King Biawak</h1>
     </header>
   )
 }
